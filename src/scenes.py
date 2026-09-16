@@ -81,10 +81,12 @@ class GameScene(BaseScene):
             self.level_index = 0
             
         self.level_data = self.game.levels[self.level_index]
-        self.cols, self.rows = self.level_data['grid_size']
+        
+        # === 匹配 levels.json 的实际键名 ===
+        self.rows, self.cols = self.level_data['grid_size']
         self.grid_map = self.level_data['map']
         
-        # 动态计算棋盘大小（为顶部和底部UI留出空间）
+        # 动态计算棋盘大小
         available_w = SCREEN_WIDTH - GRID_PADDING * 2
         available_h = SCREEN_HEIGHT - GRID_PADDING * 2 - TOP_BAR_HEIGHT - BOTTOM_BAR_HEIGHT
         self.cell_size = min(available_w // self.cols, available_h // self.rows)
@@ -93,27 +95,63 @@ class GameScene(BaseScene):
         grid_w = self.cols * self.cell_size + (self.cols - 1) * CELL_GAP
         grid_h = self.rows * self.cell_size + (self.rows - 1) * CELL_GAP
         self.offset_x = (SCREEN_WIDTH - grid_w) // 2
-
-        # 先确定可用区域的顶部和高度
-        middle_area_top = TOP_BAR_HEIGHT
-        middle_area_height = SCREEN_HEIGHT - TOP_BAR_HEIGHT - BOTTOM_BAR_HEIGHT
-
-        # 在可用区域内垂直居中
-        self.offset_y = middle_area_top + (middle_area_height - grid_h) // 2
+        self.offset_y = TOP_BAR_HEIGHT + (SCREEN_HEIGHT - TOP_BAR_HEIGHT - BOTTOM_BAR_HEIGHT - grid_h) // 2
         
-        # 初始化游戏状态变量
-        self.max_arrows = self.level_data.get('max_arrows', 0)
-        self.max_mistakes = self.level_data.get('max_mistakes', 0)
+        # 初始化状态
+        self.max_arrows = self.level_data.get('arrows_left', 0)
+        self.max_mistakes = self.level_data.get('max_failures', 0)
         self.placed_arrows = []
         self.mistake_count = 0
 
     def handle_event(self, event):
-        # 处理点击重新开始按钮
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            # 1. 处理重新开始按钮
             if self.restart_btn.collidepoint(event.pos):
                 self.level_index = 0
                 self.load_level_data()
-        pass
+                return
+            
+            # 2. 处理棋盘点击：坐标转换
+            mx, my = event.pos
+            rel_x = mx - self.offset_x
+            rel_y = my - self.offset_y
+            
+            # 检查点击是否在棋盘范围内
+            if 0 <= rel_x < self.cols * (self.cell_size + CELL_GAP) and \
+               0 <= rel_y < self.rows * (self.cell_size + CELL_GAP):
+                
+                # 根据间距和单元格大小反推行列号
+                grid_col = rel_x // (self.cell_size + CELL_GAP)
+                grid_row = rel_y // (self.cell_size + CELL_GAP)
+                
+                # 3. 触发路径检测
+                self.check_arrow_path(grid_row, grid_col)
+
+    def check_arrow_path(self, row, col):
+        """检查点击箭头的路径是否畅通（支持上/下/左/右四个方向）"""
+        if self.grid_map[row][col] == 0:
+            return
+
+        direction = self.grid_map[row][col]
+
+        dr = {DIR_UP: -1, DIR_DOWN: 1, DIR_LEFT: 0, DIR_RIGHT: 0}
+        dc = {DIR_UP: 0, DIR_DOWN: 0, DIR_LEFT: -1, DIR_RIGHT: 1}
+
+        current_r = row + dr[direction]
+        current_c = col + dc[direction]
+
+        while 0 <= current_r < self.rows and 0 <= current_c < self.cols:
+            if self.grid_map[current_r][current_c] != 0:
+                # 被阻挡 → 暂时只打印日志，不处理失误
+                print(f"❌ 碰撞！({row},{col}) 方向{direction} 被 ({current_r},{current_c}) 阻挡。")
+                return
+
+            current_r += dr[direction]
+            current_c += dc[direction]
+
+        # 路径畅通 → 消除箭头（将格子值设为0）
+        self.grid_map[row][col] = 0
+        print(f"✅ 消除！({row},{col}) 方向{direction} 飞出棋盘。")
 
     def draw(self):
         screen_w, screen_h = self.screen.get_size()
@@ -160,10 +198,6 @@ class GameScene(BaseScene):
 
     def _draw_board(self):
         """绘制棋盘网格及箭头"""
-        # 绘制网格底板
-        grid_w = self.cols * self.cell_size + (self.cols - 1) * CELL_GAP
-        grid_h = self.rows * self.cell_size + (self.rows - 1) * CELL_GAP
-        
         for r in range(self.rows):
             for c in range(self.cols):
                 x = self.offset_x + c * (self.cell_size + CELL_GAP)

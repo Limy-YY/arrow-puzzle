@@ -57,25 +57,6 @@ class GameScene(BaseScene):
         btn_w, btn_h = 140, 40
         self.restart_btn = pygame.Rect(0, 0, btn_w, btn_h)
         
-        # 初始化关卡数据
-        self.load_level_data()
-
-        # === 预加载箭头图标 ===
-        self.arrow_images = {}
-        icon_dir = os.path.join(os.path.dirname(__file__), '..', 'assets', 'icons')
-        
-        target_size = int(self.cell_size * ARROW_RATIO)
-        
-        for direction, name in [(DIR_UP, 'up'), (DIR_DOWN, 'down'), 
-                                 (DIR_LEFT, 'left'), (DIR_RIGHT, 'right')]:
-            path = os.path.join(icon_dir, f'arrow-{name}.png')
-            if os.path.exists(path):
-                img = pygame.image.load(path).convert_alpha()
-                self.arrow_images[direction] = pygame.transform.smoothscale(
-                    img, (target_size, target_size)
-                )
-            else:
-                print(f"⚠️ 未找到图标: {path}")
         # === 晃动动画状态 ===
         self.shaking_arrow = None      # 当前晃动的箭头坐标 (row, col)
         self.shake_timer = 0           # 晃动剩余时间（秒）
@@ -110,6 +91,9 @@ class GameScene(BaseScene):
             popup_btn_w, popup_btn_h
         )
 
+        # 初始化关卡数据
+        self.load_level_data()
+
     def load_level_data(self):
         """提取当前关卡的网格和尺寸，并计算布局参数"""
         if self.level_index >= len(self.game.levels):
@@ -130,6 +114,22 @@ class GameScene(BaseScene):
         grid_h = self.rows * self.cell_size + (self.rows - 1) * CELL_GAP
         self.offset_x = (SCREEN_WIDTH - grid_w) // 2
         self.offset_y = TOP_BAR_HEIGHT + (SCREEN_HEIGHT - TOP_BAR_HEIGHT - BOTTOM_BAR_HEIGHT - grid_h) // 2
+
+        # === 在此处加载并缩放箭头图片 ===
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+        icon_dir = os.path.join(project_root, 'assets', 'icons')
+        
+        self.arrow_images = {}
+        target_size = int(self.cell_size * ARROW_RATIO)
+        target_size = max(target_size, 10)
+
+        for direction, name in [(DIR_UP, 'up'), (DIR_DOWN, 'down'), (DIR_LEFT, 'left'), (DIR_RIGHT, 'right')]:
+            path = os.path.join(icon_dir, f'arrow-{name}.png')
+            if os.path.exists(path):
+                img = pygame.image.load(path).convert_alpha()
+                self.arrow_images[direction] = pygame.transform.smoothscale(img, (target_size, target_size))
+            else:
+                print(f"⚠️ 未找到图标: {path}")
         
         # 初始化状态
         self.max_arrows = self.level_data.get('arrows_left', 0)

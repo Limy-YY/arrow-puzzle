@@ -73,3 +73,15 @@ FONT_PATH = os.path.join(BASE_DIR, 'assets', 'fonts', 'Nunito-VariableFont_wght.
 if not os.path.exists(FONT_PATH):
     print(f"警告: 字体文件未找到 -> {FONT_PATH}")
     FONT_PATH = None  # 如果找不到，后面会使用系统默认字体作为兜底
+
+# === 背景与粒子配置 ===
+BG_MENU = (245, 245, 245)  # 极浅灰白，作为开始界面的底纹，比纯白更有质感
+
+# 飘动箭头的颜色池（从现有莫兰迪配色中挑选柔和的颜色）
+FLOATING_ARROW_COLORS = [
+    ARROW_UP,     # 淡红
+    ARROW_DOWN,   # 灰蓝
+    ARROW_LEFT,   # 草绿
+    ARROW_RIGHT,  # 米黄
+    ARROW_START,  # 灰褐
+]

@@ -3,6 +3,7 @@ import os
 import math
 import copy
 from settings import *
+from background import FloatingArrows 
 
 class BaseScene:
     """场景基类：所有场景都要继承它"""
@@ -21,43 +22,50 @@ class BaseScene:
 
 class StartScene(BaseScene):
     """开始界面"""
-    def __init__(self, game, font):
+    def __init__(self, game, font_bold, font_regular):
         super().__init__(game)
-        self.font = font
+        self.font_regular = font_regular
+        self.font_bold = font_bold
         if FONT_PATH and os.path.exists(FONT_PATH):
-            self.small_font = pygame.font.Font(FONT_PATH, 30)
+            self.small_font = pygame.font.Font(FONT_PATH, 22)
         else:
-            self.small_font = pygame.font.Font(None, 30)
+            self.small_font = pygame.font.Font(None, 22)
 
+        self.bg_arrows = FloatingArrows(count=30) 
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
             self.game.switch_scene('game')
 
     def draw(self):
-        self.screen.fill(BG_DARK)
-        title = self.font.render('Arrow Puzzle', True, TEXT_DARK_BG)
+        # 1. 先填充新的浅色背景
+        self.screen.fill(BG_MENU)
+        # 2. 更新并绘制飘动的彩色箭头
+        self.bg_arrows.update()
+        self.bg_arrows.draw(self.screen)
+        # 3. 最后绘制标题和提示文字，确保文字在最上层
+        title = self.font_bold.render('Arrow Puzzle', True, TEXT_LIGHT_BG)
         title_rect = title.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 40))
         self.screen.blit(title, title_rect)
-        hint = self.small_font.render('Click anywhere to start', True, TEXT_DARK_BG)
+        hint = self.small_font.render('Click anywhere to start', True, TEXT_LIGHT_BG)
         hint_rect = hint.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 40))
         self.screen.blit(hint, hint_rect)
 
 class GameScene(BaseScene):
     """游戏主界面"""
     
-    def __init__(self, game, font):
+    def __init__(self, game, font_bold, font_regular):
         super().__init__(game)
         self.level_index = 0
         
         # 1. 初始化所有需要的字体
-        self.font = font
-        if FONT_PATH and os.path.exists(FONT_PATH):
-            self.ui_font = pygame.font.Font(FONT_PATH, UI_FONT_SIZE)
-            self.btn_font = pygame.font.Font(FONT_PATH, BTN_FONT_SIZE)
-        else:
-            self.ui_font = pygame.font.Font(None, UI_FONT_SIZE)
-            self.btn_font = pygame.font.Font(None, BTN_FONT_SIZE)
+        self.font_bold = font_bold
+        self.font_regular = font_regular
+
+        font_path = FONT_PATH if (FONT_PATH and os.path.exists(FONT_PATH)) else None
+        self.popup_title_font = pygame.font.Font(font_path, 36)
+        self.ui_font = pygame.font.Font(font_path, UI_FONT_SIZE)
+        self.btn_font = pygame.font.Font(font_path, BTN_FONT_SIZE)
 
         # 2. 初始化重新开始按钮区域
         btn_w, btn_h = 140, 40
@@ -274,7 +282,7 @@ class GameScene(BaseScene):
         btn_text_rect = btn_text.get_rect(center=self.restart_btn.center)
         self.screen.blit(btn_text, btn_text_rect)
 
-                # === 弹窗绘制（仅在 won 或 lost 状态下显示）===
+        # === 弹窗绘制（仅在 won 或 lost 状态下显示）===
         if self.game_state in ('won', 'lost'):
             # 1. 半透明遮罩
             overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -290,7 +298,7 @@ class GameScene(BaseScene):
             # 3. 标题
             title_text = "Level Complete!" if self.game_state == 'won' else "Game Over"
             title_color = ARROW_TARGET if self.game_state == 'won' else BTN_RETRY
-            title = self.font.render(title_text, True, title_color)
+            title = self.popup_title_font.render(title_text, True, title_color)
             title_rect = title.get_rect(center=(SCREEN_WIDTH // 2, self.popup_y + 50))
             self.screen.blit(title, title_rect)
 
@@ -360,15 +368,19 @@ class SceneManager:
     """场景管理器：负责切换和更新当前场景"""
     def __init__(self, game):
         self.game = game
-        self.game_font = None
+
+        self.game_font_regular = None
+        self.game_font_bold = None
 
         if FONT_PATH and os.path.exists(FONT_PATH):
-            self.game_font = pygame.font.Font(FONT_PATH, TITLE_FONT_SIZE)
+            self.game_font_regular = pygame.font.Font(FONT_PATH, TITLE_FONT_SIZE)
+            self.game_font_bold = pygame.font.Font(FONT_PATH, TITLE_FONT_SIZE)
+            self.game_font_bold.set_bold(True)
             print(f"✅ SceneManager: 成功加载全局字体 -> {FONT_PATH}")
-
+        
         self.scenes = {
-            'start': StartScene(game, self.game_font),
-            'game': GameScene(game, self.game_font),
+            'start': StartScene(game, self.game_font_bold, self.game_font_regular),
+            'game': GameScene(game, self.game_font_bold, self.game_font_regular),
         }
         self.current_scene_name = 'start'
 

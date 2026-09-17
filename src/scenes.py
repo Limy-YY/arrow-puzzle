@@ -143,7 +143,6 @@ class GameScene(BaseScene):
 
             # 1. 底部"Restart"按钮（始终有效）
             if self.restart_btn.collidepoint(event.pos):
-                self.level_index = 0
                 self.load_level_data()
                 self.game_state = 'playing'
                 return
@@ -175,7 +174,7 @@ class GameScene(BaseScene):
                         self.game_state = 'playing'
                     else:
                         # 返回开始界面
-                        self.game.scene_manager.switch_scene('start')
+                        self.game.scene_manager.reset_to_start()
                     return
 
     def check_arrow_path(self, row, col):
@@ -377,3 +376,12 @@ class SceneManager:
 
     def draw(self):
         self.current_scene.draw()
+
+    def reset_to_start(self):
+        """返回开始界面并完全重置游戏进度"""
+        self.current_scene_name = 'start'
+        # 获取游戏场景实例，重置关卡索引并重新加载关卡数据
+        game_scene = self.scenes['game']
+        game_scene.level_index = 0
+        game_scene.load_level_data()
+        game_scene.game_state = 'playing'

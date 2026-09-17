@@ -4,7 +4,6 @@ import math
 import copy
 from settings import *
 
-
 class BaseScene:
     """场景基类：所有场景都要继承它"""
     def __init__(self, game):
@@ -20,13 +19,16 @@ class BaseScene:
     def draw(self):
         pass
 
-
 class StartScene(BaseScene):
     """开始界面"""
-    def __init__(self, game):
+    def __init__(self, game, font):
         super().__init__(game)
-        self.font = pygame.font.Font(None, 60)
-        self.small_font = pygame.font.Font(None, 30)
+        self.font = font
+        if FONT_PATH and os.path.exists(FONT_PATH):
+            self.small_font = pygame.font.Font(FONT_PATH, 30)
+        else:
+            self.small_font = pygame.font.Font(None, 30)
+
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -44,14 +46,18 @@ class StartScene(BaseScene):
 class GameScene(BaseScene):
     """游戏主界面"""
     
-    def __init__(self, game):
+    def __init__(self, game, font):
         super().__init__(game)
         self.level_index = 0
         
         # 1. 初始化所有需要的字体
-        self.font = pygame.font.Font(FONT_PATH, TITLE_FONT_SIZE)
-        self.ui_font = pygame.font.Font(FONT_PATH, UI_FONT_SIZE)
-        self.btn_font = pygame.font.Font(FONT_PATH, BTN_FONT_SIZE)
+        self.font = font
+        if FONT_PATH and os.path.exists(FONT_PATH):
+            self.ui_font = pygame.font.Font(FONT_PATH, UI_FONT_SIZE)
+            self.btn_font = pygame.font.Font(FONT_PATH, BTN_FONT_SIZE)
+        else:
+            self.ui_font = pygame.font.Font(None, UI_FONT_SIZE)
+            self.btn_font = pygame.font.Font(None, BTN_FONT_SIZE)
 
         # 2. 初始化重新开始按钮区域
         btn_w, btn_h = 140, 40
@@ -354,9 +360,15 @@ class SceneManager:
     """场景管理器：负责切换和更新当前场景"""
     def __init__(self, game):
         self.game = game
+        self.game_font = None
+
+        if FONT_PATH and os.path.exists(FONT_PATH):
+            self.game_font = pygame.font.Font(FONT_PATH, TITLE_FONT_SIZE)
+            print(f"✅ SceneManager: 成功加载全局字体 -> {FONT_PATH}")
+
         self.scenes = {
-            'start': StartScene(game),
-            'game': GameScene(game),
+            'start': StartScene(game, self.game_font),
+            'game': GameScene(game, self.game_font),
         }
         self.current_scene_name = 'start'
 

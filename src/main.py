@@ -5,11 +5,6 @@ import sys
 from settings import *
 from scenes import SceneManager
 
-# 获取项目根目录的绝对路径（跨平台兼容）
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-LEVELS_FILE = os.path.join(BASE_DIR, 'data', 'levels.json')
-
-
 def load_levels():
     """读取关卡数据"""
     try:

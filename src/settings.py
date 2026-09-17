@@ -1,4 +1,11 @@
 import pygame
+import os
+import sys
+
+# 获取项目根目录的绝对路径（跨平台兼容）
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LEVELS_FILE = os.path.join(BASE_DIR, 'data', 'levels.json')
+
 
 # 窗口设置
 SCREEN_WIDTH = 400
@@ -47,8 +54,22 @@ TOP_BAR_HEIGHT = 50
 BOTTOM_BAR_HEIGHT = 60
 UI_FONT_SIZE = 24
 BTN_FONT_SIZE = 22
+TITLE_FONT_SIZE = 52    # 大标题字号
 
 # === 字体配置常量 ===
-# 使用 None 表示 Pygame 默认字体，也可以替换为具体的 .ttf 文件路径
-FONT_PATH = None
-TITLE_FONT_SIZE = 52    # 大标题字号
+
+# 1. 获取项目根目录的绝对路径，确保在任何系统下都能正确找到
+if getattr(sys, 'frozen', False):
+    # 当程序被打包成 .exe 后，运行时的目录
+    BASE_DIR = sys._MEIPASS
+else:
+    # 开发时，当前脚本所在目录的上一级（即项目根目录）
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# 2. 拼接字体文件的完整路径
+FONT_PATH = os.path.join(BASE_DIR, 'assets', 'fonts', 'Nunito-VariableFont_wght.ttf')
+
+# 3. 检查字体文件是否存在
+if not os.path.exists(FONT_PATH):
+    print(f"警告: 字体文件未找到 -> {FONT_PATH}")
+    FONT_PATH = None  # 如果找不到，后面会使用系统默认字体作为兜底

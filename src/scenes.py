@@ -73,7 +73,14 @@ class GameScene(BaseScene):
                 )
             else:
                 print(f"⚠️ 未找到图标: {path}")
-        # =====================
+        # === 晃动动画状态 ===
+        self.shaking_arrow = None      # 当前晃动的箭头坐标 (row, col)
+        self.shake_timer = 0           # 晃动剩余时间（秒）
+        self.shake_intensity = 4       # 晃动幅度（像素）
+        self.shake_frequency = 30      # 晃动频率（Hz，控制正弦波速度）
+
+        # === 通关状态标志 ===
+        self.is_level_complete = False
 
     def load_level_data(self):
         """提取当前关卡的网格和尺寸，并计算布局参数"""
@@ -104,6 +111,9 @@ class GameScene(BaseScene):
         self.mistake_count = 0
 
     def handle_event(self, event):
+        if self.is_level_complete:
+            return  # 通关状态下禁止操作棋盘
+    
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             # 1. 处理重新开始按钮
             if self.restart_btn.collidepoint(event.pos):
@@ -142,8 +152,15 @@ class GameScene(BaseScene):
 
         while 0 <= current_r < self.rows and 0 <= current_c < self.cols:
             if self.grid_map[current_r][current_c] != 0:
-                # 被阻挡 → 暂时只打印日志，不处理失误
-                print(f"❌ 碰撞！({row},{col}) 方向{direction} 被 ({current_r},{current_c}) 阻挡。")
+                # 被阻挡 → 触发晃动动画 + 失误计数
+                self.shaking_arrow = (row, col)
+                self.shake_timer = 0.3
+                self.mistake_count += 1
+                
+                # 判定失败
+                if self.mistake_count >= self.max_mistakes:
+                    print("❌ 游戏失败！重新开始本关。")
+                    self.load_level_data() # 重新加载当前关卡以重置
                 return
 
             current_r += dr[direction]
@@ -152,6 +169,27 @@ class GameScene(BaseScene):
         # 路径畅通 → 消除箭头（将格子值设为0）
         self.grid_map[row][col] = 0
         print(f"✅ 消除！({row},{col}) 方向{direction} 飞出棋盘。")
+
+        # 判定胜利：检查棋盘上是否还有非0箭头
+        arrows_remaining = any(cell != 0 for row_data in self.grid_map for cell in row_data)
+        if not arrows_remaining:
+            self.is_level_complete = True  # 先设标志
+            print("🎉 恭喜通关本关！")
+            if self.level_index < len(self.game.levels) - 1:
+                self.level_index += 1
+                self.load_level_data()
+            else:
+                print("🎊 已通关所有关卡！")
+
+    def update(self, dt):
+        """每帧更新逻辑"""
+        # 更新晃动动画计时器
+        if self.shake_timer > 0:
+            self.shake_timer -= dt
+            if self.shake_timer <= 0:
+                self.shake_timer = 0
+                self.shaking_arrow = None
+
 
     def draw(self):
         screen_w, screen_h = self.screen.get_size()
@@ -196,6 +234,20 @@ class GameScene(BaseScene):
         btn_text_rect = btn_text.get_rect(center=self.restart_btn.center)
         self.screen.blit(btn_text, btn_text_rect)
 
+        # --- 通关提示遮罩 ---
+        if self.is_level_complete:
+            # 绘制半透明遮罩
+            overlay = pygame.Surface((screen_w, screen_h), pygame.SRCALPHA)
+            pygame.draw.rect(overlay, (*BG_DARK[:3], 180), overlay.get_rect()) 
+            self.screen.blit(overlay, (0, 0))
+            
+            # 渲染提示文字
+            title = self.title_font.render('Level Complete!', True, TEXT_DARK_BG)
+            subtitle = self.ui_font.render('Next level loading...', True, TEXT_DARK_BG)
+            
+            self.screen.blit(title, title.get_rect(center=(screen_w // 2, screen_h // 2 - 20)))
+            self.screen.blit(subtitle, subtitle.get_rect(center=(screen_w // 2, screen_h // 2 + 30)))
+
     def _draw_board(self):
         """绘制棋盘网格及箭头"""
         for r in range(self.rows):
@@ -210,18 +262,33 @@ class GameScene(BaseScene):
                 
                 # 绘制当前格子里的箭头
                 if self.grid_map[r][c] != 0:
-                    self._draw_arrow(x, y, self.grid_map[r][c])
+                    self._draw_arrow(x, y, self.grid_map[r][c], row=r, col=c)
 
-    def _draw_arrow(self, x, y, direction):
-        """使用PNG图标绘制箭头"""
+    def _draw_arrow(self, x, y, direction, row=None, col=None):
+        """使用PNG图标绘制箭头，支持晃动效果"""
         img = self.arrow_images.get(direction)
         if img is None:
             return
         
-        img_rect = img.get_rect(center=(
-            x + self.cell_size // 2,
-            y + self.cell_size // 2
-        ))
+        # 计算中心坐标
+        center_x = x + self.cell_size // 2
+        center_y = y + self.cell_size // 2
+        
+        # 如果当前箭头正在晃动，计算水平偏移量
+        offset_x = 0
+        if (self.shaking_arrow is not None and 
+            row is not None and col is not None and
+            self.shaking_arrow == (row, col) and
+            self.shake_timer > 0):
+            # 使用正弦波产生周期性偏移
+            import math
+            progress = 1.0 - (self.shake_timer / 0.3)  # 0 → 1
+            # 衰减因子：晃动逐渐减弱
+            decay = 1.0 - progress
+            offset_x = int(math.sin(progress * math.pi * self.shake_frequency * 0.3) 
+                        * self.shake_intensity * decay)
+        
+        img_rect = img.get_rect(center=(center_x + offset_x, center_y))
         self.screen.blit(img, img_rect)
 
 class SceneManager:

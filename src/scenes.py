@@ -22,8 +22,9 @@ class BaseScene:
 
 class StartScene(BaseScene):
     """开始界面"""
-    def __init__(self, game, font_bold, font_regular):
+    def __init__(self, game, scene_manager, font_bold, font_regular):
         super().__init__(game)
+        self.scene_manager = scene_manager
         self.font_regular = font_regular
         self.font_bold = font_bold
         if FONT_PATH and os.path.exists(FONT_PATH):
@@ -34,8 +35,8 @@ class StartScene(BaseScene):
         self.bg_arrows = FloatingArrows(count=30) 
 
     def handle_event(self, event):
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            self.game.switch_scene('game')
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            self.scene_manager.switch_scene('game')
 
     def draw(self):
         # 1. 先填充新的浅色背景
@@ -376,10 +377,9 @@ class SceneManager:
             self.game_font_regular = pygame.font.Font(FONT_PATH, TITLE_FONT_SIZE)
             self.game_font_bold = pygame.font.Font(FONT_PATH, TITLE_FONT_SIZE)
             self.game_font_bold.set_bold(True)
-            print(f"✅ SceneManager: 成功加载全局字体 -> {FONT_PATH}")
         
         self.scenes = {
-            'start': StartScene(game, self.game_font_bold, self.game_font_regular),
+            'start': StartScene(self.game, self, self.game_font_bold, self.game_font_regular),
             'game': GameScene(game, self.game_font_bold, self.game_font_regular),
         }
         self.current_scene_name = 'start'

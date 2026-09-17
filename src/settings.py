@@ -47,3 +47,8 @@ TOP_BAR_HEIGHT = 50
 BOTTOM_BAR_HEIGHT = 60
 UI_FONT_SIZE = 24
 BTN_FONT_SIZE = 22
+
+# === 字体配置常量 ===
+# 使用 None 表示 Pygame 默认字体，也可以替换为具体的 .ttf 文件路径
+FONT_PATH = None
+TITLE_FONT_SIZE = 52    # 大标题字号

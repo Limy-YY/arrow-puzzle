@@ -63,6 +63,7 @@ class GameScene(BaseScene):
         # === 预加载箭头图标 ===
         self.arrow_images = {}
         icon_dir = os.path.join(os.path.dirname(__file__), '..', 'assets', 'icons')
+        
         target_size = int(self.cell_size * ARROW_RATIO)
         
         for direction, name in [(DIR_UP, 'up'), (DIR_DOWN, 'down'), 

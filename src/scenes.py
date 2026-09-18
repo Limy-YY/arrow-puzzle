@@ -83,7 +83,7 @@ class GameScene(BaseScene):
         # 状态分为 'playing' (游戏中), 'won' (通关), 'lost' (失败)
         self.game_state = 'playing'
 
-        # === 新增：弹窗按钮 Rect ===
+        # === 弹窗按钮 Rect ===
         # 弹窗尺寸
         self.popup_width = 300
         self.popup_height = 200
@@ -106,6 +106,19 @@ class GameScene(BaseScene):
             self.popup_y + self.popup_height - 60,
             popup_btn_w, popup_btn_h
         )
+
+        # === 加载顶部状态栏图标 ===
+        self.icon_level = pygame.image.load(os.path.join(BASE_DIR, 'assets', 'icons', 'flag.png')).convert_alpha()
+        self.icon_level = pygame.transform.scale(self.icon_level, (ICON_SIZE, ICON_SIZE))
+        
+        self.icon_arrow = pygame.image.load(os.path.join(BASE_DIR, 'assets', 'icons', 'arrow.png')).convert_alpha()
+        self.icon_arrow = pygame.transform.scale(self.icon_arrow, (ICON_SIZE, ICON_SIZE))
+        
+        self.icon_heart = pygame.image.load(os.path.join(BASE_DIR, 'assets', 'icons', 'heart-full.png')).convert_alpha()
+        self.icon_heart = pygame.transform.scale(self.icon_heart, (ICON_SIZE, ICON_SIZE))
+
+        self.icon_heart_empty = pygame.image.load(os.path.join(BASE_DIR, 'assets', 'icons', 'heart-empty.png')).convert_alpha()
+        self.icon_heart_empty = pygame.transform.scale(self.icon_heart_empty, (ICON_SIZE, ICON_SIZE))
 
         # 初始化关卡数据
         self.load_level_data()
@@ -240,49 +253,16 @@ class GameScene(BaseScene):
                 self.shake_timer = 0
                 self.shaking_arrow = None
 
-
     def draw(self):
         screen_w, screen_h = self.screen.get_size()
         self.screen.fill(BG_LIGHT)
         
-        # --- 顶部信息栏 ---
-        top_bar = pygame.Rect(0, 0, screen_w, TOP_BAR_HEIGHT)
-        pygame.draw.rect(self.screen, BG_DARK, top_bar)
-        
-        # 获取当前实时数据
-        arrows_left = max(0, self.max_arrows - len(self.placed_arrows))
-        mistakes_left = max(0, self.max_mistakes - self.mistake_count)
-        
-        # 渲染文本
-        level_surf = self.ui_font.render(f"Level: {self.level_index + 1}", True, TEXT_DARK_BG)
-        arrow_surf = self.ui_font.render(f"Arrows: {arrows_left}", True, TEXT_DARK_BG)
-        mistake_surf = self.ui_font.render(f"Lives: {mistakes_left}", True, TEXT_DARK_BG)
-        
-        # 居中绘制
-        bar_y = (TOP_BAR_HEIGHT - level_surf.get_height()) // 2
-        self.screen.blit(level_surf, (20, bar_y))
-        self.screen.blit(arrow_surf, ((screen_w - arrow_surf.get_width()) // 2, bar_y))
-        self.screen.blit(mistake_surf, (screen_w - mistake_surf.get_width() - 20, bar_y))
+        self.draw_top_bar()
         
         # --- 绘制棋盘 ---
         self._draw_board()
         
-        # --- 底部按钮栏 ---
-        bottom_bar = pygame.Rect(0, screen_h - BOTTOM_BAR_HEIGHT, screen_w, BOTTOM_BAR_HEIGHT)
-        pygame.draw.rect(self.screen, BG_DARK, bottom_bar)
-        
-        # 动态计算按钮位置并居中
-        self.restart_btn.centerx = screen_w // 2
-        self.restart_btn.centery = screen_h - (BOTTOM_BAR_HEIGHT // 2)
-        
-        # 绘制按钮（带悬停变色效果）
-        mouse_pos = pygame.mouse.get_pos()
-        btn_color = BTN_NEXT if self.restart_btn.collidepoint(mouse_pos) else BTN_RESTART
-        pygame.draw.rect(self.screen, btn_color, self.restart_btn, border_radius=6)
-        
-        btn_text = self.btn_font.render("Restart", True, TEXT_DARK_BG)
-        btn_text_rect = btn_text.get_rect(center=self.restart_btn.center)
-        self.screen.blit(btn_text, btn_text_rect)
+        self.draw_restart_btn()
 
         # === 弹窗绘制（仅在 won 或 lost 状态下显示）===
         if self.game_state in ('won', 'lost'):
@@ -408,6 +388,72 @@ class GameScene(BaseScene):
     def update(self, dt):
         """更新场景逻辑，这里用来获取鼠标绝对坐标"""
         self.mouse_pos = pygame.mouse.get_pos()
+
+    def draw_top_bar(self):
+        """绘制新的浅灰色状态栏"""
+        # 1. 绘制顶部浅灰背景
+        top_rect = pygame.Rect(0, 0, SCREEN_WIDTH, TOP_BAR_HEIGHT)
+        pygame.draw.rect(self.game.screen, STATUS_BAR_COLOR, top_rect)
+        
+        # 状态栏总宽度，分为三等份
+        section_width = SCREEN_WIDTH // 3
+        y_center = TOP_BAR_HEIGHT // 2
+        
+        # === 左侧：绘制关卡进度 (旗子 + 数字) ===
+        current_level = self.level_index + 1
+        level_text = self.ui_font.render(f"{current_level}", True, STATUS_TEXT_COLOR)
+        x_level = section_width // 2 - (self.icon_level.get_width() + ICON_SPACING + level_text.get_width()) // 2
+        self.game.screen.blit(self.icon_level, (x_level, y_center - self.icon_level.get_height() // 2))
+        self.game.screen.blit(level_text, (x_level + self.icon_level.get_width() + ICON_SPACING, y_center - level_text.get_height() // 2))
+
+        # === 中间：绘制剩余步数 (箭头 + 数字) ===
+        arrows_left = self.max_arrows - len(self.placed_arrows)
+        arrow_text = self.ui_font.render(f"{arrows_left}", True, STATUS_TEXT_COLOR)
+        x_arrow = SCREEN_WIDTH // 2 - (self.icon_arrow.get_width() + ICON_SPACING + arrow_text.get_width()) // 2
+        # 直接绘制原图，不进行任何染色
+        self.game.screen.blit(self.icon_arrow, (x_arrow, y_center - self.icon_arrow.get_height() // 2))
+        self.game.screen.blit(arrow_text, (x_arrow + self.icon_arrow.get_width() + ICON_SPACING, y_center - arrow_text.get_height() // 2))
+
+        # === 右侧：绘制生命值 (实心/空心爱心) ===
+        hearts_container_w = self.max_mistakes * (self.icon_heart.get_width() + 4)
+        x_hearts_start = SCREEN_WIDTH - section_width // 2 - hearts_container_w // 2
+        
+        for i in range(self.max_mistakes):
+            pos_x = x_hearts_start + i * (self.icon_heart.get_width() + 4)
+            pos_y = y_center - self.icon_heart.get_height() // 2
+            
+            # 判断绘制实心还是空心爱心
+            if i < (self.max_mistakes - self.mistake_count):
+                # 剩余生命，绘制实心爱心
+                self.game.screen.blit(self.icon_heart, (pos_x, pos_y))
+            else:
+                # 已失去生命，绘制空心爱心
+                if hasattr(self, 'icon_heart_empty'):
+                    self.game.screen.blit(self.icon_heart_empty, (pos_x, pos_y))
+
+    def draw_restart_btn(self):
+        """绘制底部重新开始按钮"""
+        # 1. 绘制底部浅灰背景
+        bottom_rect = pygame.Rect(0, SCREEN_HEIGHT - BOTTOM_BAR_HEIGHT, SCREEN_WIDTH, BOTTOM_BAR_HEIGHT)
+        pygame.draw.rect(self.game.screen, STATUS_BAR_COLOR, bottom_rect)
+        
+        # 2. 更新 restart_btn 的位置以适配底部栏（水平垂直居中）
+        btn_w, btn_h = self.restart_btn.size
+        self.restart_btn.topleft = (
+            SCREEN_WIDTH // 2 - btn_w // 2, 
+            SCREEN_HEIGHT - BOTTOM_BAR_HEIGHT + (BOTTOM_BAR_HEIGHT - btn_h) // 2
+        )
+        
+        # 3. 绘制按钮底色（使用 settings.py 中已定义的 BTN_RESTART）
+        pygame.draw.rect(self.game.screen, BTN_RESTART, self.restart_btn, border_radius=8)
+        
+        # 4. 绘制按钮边框（可选：用浅灰色描边，或者干脆不要边框更简洁）
+        pygame.draw.rect(self.game.screen, pygame.Color('#C0C0C0'), self.restart_btn, 2, border_radius=8)
+        
+        # 5. 绘制按钮文字
+        btn_text = self.btn_font.render("Restart", True, TEXT_LIGHT_BG)
+        text_rect = btn_text.get_rect(center=self.restart_btn.center)
+        self.game.screen.blit(btn_text, text_rect)
 
 class SceneManager:
     """场景管理器：负责切换和更新当前场景"""

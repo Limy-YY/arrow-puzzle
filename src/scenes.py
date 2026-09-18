@@ -192,23 +192,28 @@ class GameScene(BaseScene):
 
                 rel_x = mx - self.offset_x
                 rel_y = my - self.offset_y
-                if 0 <= rel_x < self.cols * (self.cell_size + CELL_GAP) and \
-                   0 <= rel_y < self.rows * (self.cell_size + CELL_GAP):
-                    
-                    grid_col = rel_x // (self.cell_size + CELL_GAP)
-                    grid_row = rel_y // (self.cell_size + CELL_GAP)
-                    
-                    # --- 核心改动：调用“侦探”函数 ---
-                    status = self.get_arrow_status(grid_row, grid_col)
-                    
-                    # 如果是空格子，则不执行任何操作
-                    if status == 'invalid':
-                        return
-
-                    # 根据“侦探”的汇报，立即执行奖惩逻辑
-                    self.check_arrow_path(status, grid_row, grid_col)
-                return
-
+                
+                # 遍历所有格子，用 collidepoint 精确检测点击了哪个格子
+                for r in range(self.rows):
+                    for c in range(self.cols):
+                        cell_x = self.offset_x + c * (self.cell_size + CELL_GAP)
+                        cell_y = self.offset_y + r * (self.cell_size + CELL_GAP)
+                        cell_rect = pygame.Rect(cell_x, cell_y, self.cell_size, self.cell_size)
+                        
+                        if cell_rect.collidepoint(mx, my):
+                            # 点击的格子有箭头，启动移动动画
+                            if self.grid_map[r][c] != 0:
+                                # 计算箭头的初始屏幕坐标（中心点）
+                                start_px = cell_x + self.cell_size // 2
+                                start_py = cell_y + self.cell_size // 2
+                                
+                                self.moving_arrow = {
+                                    'start_pos': (r, c),
+                                    'current_pos': (start_px, start_py),
+                                    'direction': self.grid_map[r][c]
+                                }
+                            return
+                        
             # 3. === 弹窗按钮处理（仅在 won/lost 状态下有效）===
             if self.game_state in ('won', 'lost'):
                 # Retry 按钮：重新加载当前关卡
@@ -286,13 +291,104 @@ class GameScene(BaseScene):
                 self.game_state = 'lost'
 
     def update(self, dt):
-        """每帧更新逻辑"""
+        """更新场景逻辑"""
+        # 获取鼠标绝对坐标
+        self.mouse_pos = pygame.mouse.get_pos()
+
+        # 处理箭头移动动画
+        if self.moving_arrow is not None and self.game_state == 'playing':
+            self._update_moving_arrow(dt)
+
         # 更新晃动动画计时器
         if self.shake_timer > 0:
             self.shake_timer -= dt
             if self.shake_timer <= 0:
                 self.shake_timer = 0
                 self.shaking_arrow = None
+
+    def _update_moving_arrow(self, dt):
+        """处理移动中箭头的逻辑"""
+        arrow = self.moving_arrow
+        start_row, start_col = arrow['start_pos']
+        direction = arrow['direction']
+        
+        # 1. 更新位置
+        move_distance = self.move_speed * dt
+        curr_x, curr_y = arrow['current_pos']
+        
+        if direction == DIR_UP:
+            curr_y -= move_distance
+        elif direction == DIR_DOWN:
+            curr_y += move_distance
+        elif direction == DIR_LEFT:
+            curr_x -= move_distance
+        elif direction == DIR_RIGHT:
+            curr_x += move_distance
+            
+        arrow['current_pos'] = (curr_x, curr_y)
+
+        # 2. 计算箭头的像素边界（用于碰撞检测）
+        half = self.cell_size // 2
+        arrow_left = curr_x - half
+        arrow_right = curr_x + half
+        arrow_top = curr_y - half
+        arrow_bottom = curr_y + half
+
+        # 3. 碰撞检测：检查箭头是否与路径上的其他箭头重叠
+        # 计算箭头中心所在的逻辑格子
+        center_col = (curr_x - self.offset_x) // (self.cell_size + CELL_GAP)
+        center_row = (curr_y - self.offset_y) // (self.cell_size + CELL_GAP)
+        
+        # 沿移动方向检查前方格子是否有箭头
+        dr = {DIR_UP: -1, DIR_DOWN: 1, DIR_LEFT: 0, DIR_RIGHT: 0}
+        dc = {DIR_UP: 0, DIR_DOWN: 0, DIR_LEFT: -1, DIR_RIGHT: 1}
+        
+        # 检查前方1-2个格子（覆盖箭头尺寸范围）
+        for step in range(1, 3):
+            check_r = int(center_row) + dr[direction] * step
+            check_c = int(center_col) + dc[direction] * step
+            
+            # 跳过起点格子
+            if (check_r, check_c) == (start_row, start_col):
+                continue
+            
+            # 检查是否在棋盘范围内且有箭头
+            if 0 <= check_r < self.rows and 0 <= check_c < self.cols:
+                if self.grid_map[check_r][check_c] != 0:
+                    # 计算被碰撞箭头的像素位置
+                    other_x = self.offset_x + check_c * (self.cell_size + CELL_GAP) + self.cell_size // 2
+                    other_y = self.offset_y + check_r * (self.cell_size + CELL_GAP) + self.cell_size // 2
+                    other_half = self.cell_size // 2
+                    
+                    # 像素级矩形碰撞检测
+                    if (arrow_right > other_x - other_half and 
+                        arrow_left < other_x + other_half and
+                        arrow_bottom > other_y - other_half and 
+                        arrow_top < other_y + other_half):
+                        # 发生碰撞！触发晃动并返回原位
+                        self.check_arrow_path('blocked', start_row, start_col)
+                        self.moving_arrow = None
+                        return
+
+        # 4. 边界检测：用像素坐标判断是否完全飞出棋盘
+        board_left = self.offset_x
+        board_right = self.offset_x + self.cols * (self.cell_size + CELL_GAP) - CELL_GAP
+        board_top = self.offset_y
+        board_bottom = self.offset_y + self.rows * (self.cell_size + CELL_GAP) - CELL_GAP
+        
+        # 箭头完全飞出棋盘才判定为成功
+        if direction == DIR_UP and arrow_bottom < board_top:
+            self.check_arrow_path('clear', start_row, start_col)
+            self.moving_arrow = None
+        elif direction == DIR_DOWN and arrow_top > board_bottom:
+            self.check_arrow_path('clear', start_row, start_col)
+            self.moving_arrow = None
+        elif direction == DIR_LEFT and arrow_right < board_left:
+            self.check_arrow_path('clear', start_row, start_col)
+            self.moving_arrow = None
+        elif direction == DIR_RIGHT and arrow_left > board_right:
+            self.check_arrow_path('clear', start_row, start_col)
+            self.moving_arrow = None
 
     def draw(self):
         screen_w, screen_h = self.screen.get_size()
@@ -302,6 +398,15 @@ class GameScene(BaseScene):
         
         # --- 绘制棋盘 ---
         self._draw_board()
+        
+        # === 新增：绘制正在移动的箭头 ===
+        if self.moving_arrow is not None:
+            arrow = self.moving_arrow
+            direction = arrow['direction']
+            pos = arrow['current_pos']
+            # 创建一个临时 rect 仅用于确定箭头大小，位置由 pos 参数决定
+            temp_rect = pygame.Rect(0, 0, self.cell_size, self.cell_size)
+            self._draw_arrow(temp_rect, direction, pos=pos)
         
         self.draw_restart_btn()
 
@@ -362,8 +467,12 @@ class GameScene(BaseScene):
                 # 2. 绘制当前格子里的箭头
                 arrow_dir = self.grid_map[r][c]
                 if arrow_dir != 0:
+                    # === 新增：跳过正在移动的箭头所在的格子，避免重影 ===
+                    if (self.moving_arrow is not None and 
+                        self.moving_arrow['start_pos'] == (r, c)):
+                        continue
                     # 传入 rect，让箭头绘制方法能够根据格子大小缩放
-                    self._draw_arrow(cell_rect, arrow_dir)
+                    self._draw_arrow(cell_rect, arrow_dir, row=r, col=c)
 
         # 在循环结束后，绘制棋盘外边框
         board_rect = pygame.Rect(
@@ -380,15 +489,19 @@ class GameScene(BaseScene):
         inner_rect = board_rect.inflate(0, 0) 
         pygame.draw.rect(self.screen, BORDER_LINE_COLOR, inner_rect, width=2, border_radius=8)
 
-    def _draw_arrow(self, rect, direction, row=None, col=None):
+    def _draw_arrow(self, rect, direction, row=None, col=None, pos=None):
         """使用PNG图标绘制箭头，支持晃动效果并自动上色"""
         img = self.arrow_images.get(direction)
         if img is None:
             return
         
         # 计算中心坐标
-        center_x = rect.centerx
-        center_y = rect.centery
+        if pos is not None:
+            # 如果提供了像素坐标，则使用该坐标作为中心点（用于移动动画）
+            center_x, center_y = pos
+        else:
+            center_x = rect.centerx
+            center_y = rect.centery
         
         # 如果当前箭头正在晃动，计算水平偏移量
         offset_x = 0
@@ -425,10 +538,6 @@ class GameScene(BaseScene):
         else:
             # 如果没有定义颜色，直接绘制原图
             self.screen.blit(img, img_rect)
-
-    def update(self, dt):
-        """更新场景逻辑，这里用来获取鼠标绝对坐标"""
-        self.mouse_pos = pygame.mouse.get_pos()
 
     def draw_top_bar(self):
         """绘制新的浅灰色状态栏"""

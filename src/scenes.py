@@ -66,6 +66,7 @@ class GameScene(BaseScene):
 
         font_path = FONT_PATH if (FONT_PATH and os.path.exists(FONT_PATH)) else None
         self.popup_title_font = pygame.font.Font(font_path, 36)
+        self.popup_title_font.set_bold(True)
         self.ui_font = pygame.font.Font(font_path, UI_FONT_SIZE)
         self.btn_font = pygame.font.Font(font_path, BTN_FONT_SIZE)
 
@@ -232,10 +233,8 @@ class GameScene(BaseScene):
                 # 点击左侧按钮
                 if self.popup_left_btn.collidepoint(event.pos):
                     if self.game_state == 'won':
-                        # 胜利时，左侧按钮是 "Next"
-                        self.level_index += 1
-                        self.load_level_data()
-                        self.game_state = 'playing'
+                        # 胜利时，左侧按钮是 "Return"
+                        self.game.scene_manager.reset_to_start()
                     else:
                         # 失败或全通关时，左侧按钮是 "Return"
                         self.game.scene_manager.reset_to_start()
@@ -244,8 +243,10 @@ class GameScene(BaseScene):
                 # 点击右侧按钮
                 if self.popup_right_btn.collidepoint(event.pos):
                     if self.game_state == 'won':
-                        # 胜利时，右侧按钮是 "Return"
-                        self.game.scene_manager.reset_to_start()
+                        # 胜利时，右侧按钮是 "Next"
+                        self.level_index += 1
+                        self.load_level_data()
+                        self.game_state = 'playing'
                     elif self.game_state == 'lost':
                         # 失败时，右侧按钮是 "Retry"
                         self.load_level_data()
@@ -476,21 +477,30 @@ class GameScene(BaseScene):
             pygame.draw.rect(self.screen, BG_LIGHT, popup_rect, border_radius=12)
             pygame.draw.rect(self.screen, BG_DARK, popup_rect, width=2, border_radius=12)
 
-            # 3. 标题
+            # 3. 标题（大标题 + 副标题）
             if self.game_state == 'all_completed':
-                title_text = "All Levels Complete!"
-                title_color = ARROW_TARGET
+                title_text = "Congratulations!"
+                subtitle_text = "You've cleared all levels!"
+                title_color = POPUP_TITLE_ALL_COMPLETED
             elif self.game_state == 'won':
                 title_text = "Level Complete!"
-                title_color = ARROW_TARGET
-            else:
+                subtitle_text = "Good job!"
+                title_color = POPUP_TITLE_WON
+            else:  # lost
                 title_text = "Game Over"
-                title_color = BTN_RETRY
+                subtitle_text = "Don't give up, try again!"
+                title_color = POPUP_TITLE_LOST
 
-            title = self.popup_title_font.render(title_text, True, title_color)
-            title_rect = title.get_rect(center=(SCREEN_WIDTH // 2, self.popup_y + 50))
-            self.screen.blit(title, title_rect)
+            # 渲染大标题（粗体）
+            title_surface = self.popup_title_font.render(title_text, True, title_color)
+            title_rect = title_surface.get_rect(center=(SCREEN_WIDTH // 2, self.popup_y + 45))
+            self.screen.blit(title_surface, title_rect)
 
+            # 渲染副标题（小字号，间距15px）
+            subtitle_font = pygame.font.Font(FONT_PATH, 22) if FONT_PATH else pygame.font.Font(None, 22)
+            subtitle_surface = subtitle_font.render(subtitle_text, True, STATUS_TEXT_COLOR)
+            subtitle_rect = subtitle_surface.get_rect(center=(SCREEN_WIDTH // 2, title_rect.bottom + 15))
+            self.screen.blit(subtitle_surface, subtitle_rect)
             # 4. 按钮
             if self.game_state == 'all_completed':
                 # --- 全通关状态 ---
@@ -508,17 +518,18 @@ class GameScene(BaseScene):
 
             elif self.game_state == 'won':
                 # --- 胜利状态 ---
-                # 左侧按钮: Next
-                pygame.draw.rect(self.screen, BTN_NEXT, self.popup_left_btn, border_radius=8)
+                # 左侧按钮: Return
+                pygame.draw.rect(self.screen, BTN_BACK, self.popup_left_btn, border_radius=8)
+                return_text = self.btn_font.render("Return", True, TEXT_DARK_BG)
+                return_text_rect = return_text.get_rect(center=self.popup_left_btn.center)
+                self.screen.blit(return_text, return_text_rect)
+
+                # 右侧按钮: Next
+                pygame.draw.rect(self.screen, BTN_NEXT, self.popup_right_btn, border_radius=8)
                 next_text = self.btn_font.render("Next", True, TEXT_DARK_BG)
-                next_text_rect = next_text.get_rect(center=self.popup_left_btn.center)
+                next_text_rect = next_text.get_rect(center=self.popup_right_btn.center)
                 self.screen.blit(next_text, next_text_rect)
 
-                # 右侧按钮: Return
-                pygame.draw.rect(self.screen, BTN_BACK, self.popup_right_btn, border_radius=8)
-                return_text = self.btn_font.render("Return", True, TEXT_DARK_BG)
-                return_text_rect = return_text.get_rect(center=self.popup_right_btn.center)
-                self.screen.blit(return_text, return_text_rect)
 
             else:  # self.game_state == 'lost'
                 # --- 失败状态 ---

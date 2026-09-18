@@ -22,11 +22,10 @@ ARROW_TARGET = pygame.Color('#E07A5F')
 
 # 按钮颜色
 BTN_START = pygame.Color('#9CAF88')
-BTN_NEXT = pygame.Color('#98A9BD')
-BTN_RETRY = pygame.Color('#D4B0B5')
-BTN_RESTART = pygame.Color('#B5A89C')
-BTN_BACK = pygame.Color('#9E9E9E')
-
+BTN_NEXT = pygame.Color('#8BB4D4') 
+BTN_RETRY = pygame.Color('#E8B4B8')   
+BTN_RESTART = pygame.Color('#B5A89C') 
+BTN_BACK = pygame.Color('#779c66')    
 # 文字颜色
 TEXT_DARK_BG = pygame.Color('#F2EFE4')
 TEXT_LIGHT_BG = pygame.Color('#3C3C3C')
@@ -82,3 +81,8 @@ STATUS_BAR_COLOR = pygame.Color("#F5F2EC")
 STATUS_TEXT_COLOR = pygame.Color('#5A5348')
 HEART_EMPTY_COLOR = pygame.Color('#C8BFB4') 
 BOTTOM_BORDER_COLOR = pygame.Color('#D8D0C5')
+
+# 弹窗标题颜色
+POPUP_TITLE_WON = pygame.Color("#517d74")      # 通关 - 灰豆绿
+POPUP_TITLE_LOST = pygame.Color('#D4A5A5')     # 失败 - 灰粉
+POPUP_TITLE_ALL_COMPLETED = pygame.Color('#e0be9a')  # 全通关 - 灰棕

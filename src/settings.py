@@ -52,6 +52,8 @@ BOTTOM_BAR_HEIGHT = 60
 UI_FONT_SIZE = 24
 BTN_FONT_SIZE = 22
 TITLE_FONT_SIZE = 52
+TIME_WARNING_THRESHOLD = 10  # 倒计时低于10秒时触发预警
+TIME_WARNING_COLOR = pygame.Color('#D4A5A5') # 预警颜色（灰粉色）
 
 # === 字体配置 ===
 if getattr(sys, 'frozen', False):

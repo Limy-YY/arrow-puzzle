@@ -246,6 +246,12 @@ class GameScene(BaseScene):
         # 状态分为 'playing' (游戏中), 'won' (通关), 'lost' (失败)
         self.game_state = 'playing'
 
+        # === 计时器相关属性 ===
+        self.time_limit = 0          # 关卡总时间限制（秒）
+        self.time_remaining = 0.0    # 剩余时间（秒）
+        self.timer_running = False   # 计时器是否正在运行
+        self.level_time_used = 0     # 本关通关用时（秒）
+
         # === 弹窗按钮 Rect ===
         # 弹窗尺寸
         self.popup_width = 300
@@ -283,6 +289,9 @@ class GameScene(BaseScene):
 
         self.icon_heart_empty = pygame.image.load(os.path.join(BASE_DIR, 'assets', 'icons', 'heart-empty.png')).convert_alpha()
         self.icon_heart_empty = pygame.transform.scale(self.icon_heart_empty, (ICON_SIZE, ICON_SIZE))
+
+        self.icon_clock = pygame.image.load(os.path.join(BASE_DIR, 'assets', 'icons', 'clock.png')).convert_alpha()
+        self.icon_clock = pygame.transform.scale(self.icon_clock, (ICON_SIZE, ICON_SIZE))
 
         # === 移动动画配置 ===
         self.move_speed = 600  # 像素/秒，可以调整这个值来改变箭头飞行速度
@@ -344,13 +353,25 @@ class GameScene(BaseScene):
         self.placed_arrows = []
         self.mistake_count = 0
 
+        # 初始化计时器
+        self.time_limit = self.level_data.get('time_limit', 60)  # 默认60秒
+        self.time_remaining = float(self.time_limit)
+        self.timer_running = True
+
     def check_level_target(self):
         """
         检查当前关卡目标是否达成
         通关条件：所有箭头都已发出
         """
-        return len(self.placed_arrows) >= self.max_arrows
-
+        # 1. 检查所有箭头是否都已消除
+        arrows_cleared = len(self.placed_arrows) >= self.max_arrows
+        
+        # 2. 检查时间是否耗尽
+        time_up = self.time_remaining <= 0
+        
+        # 只有当箭头全部消除且时间未耗尽时，才算达成目标
+        return arrows_cleared and not time_up
+    
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mx, my = event.pos
@@ -479,7 +500,16 @@ class GameScene(BaseScene):
         # 获取鼠标绝对坐标
         self.mouse_pos = pygame.mouse.get_pos()
 
-        # === 新增：检测鼠标悬停的单元格 ===
+        # === 新增：计时器逻辑 ===
+        if self.timer_running and self.game_state == 'playing':
+            self.time_remaining -= dt
+            if self.time_remaining <= 0:
+                self.time_remaining = 0
+                self.timer_running = False
+                self.game_state = 'lost'
+                print("⏰ 时间到！游戏失败。")
+
+        # === 检测鼠标悬停的单元格 ===
         self.hover_cell = None
         if self.game_state == 'playing':
             mx, my = self.mouse_pos
@@ -517,10 +547,12 @@ class GameScene(BaseScene):
 
         # 1. 检查关卡目标是否达成
         level_target_met = self.check_level_target()
-
+        
         # 2. 根据目标达成情况判定游戏状态
         if level_target_met:
             # 目标达成，玩家胜利
+            self.timer_running = False  # 停止计时
+            self.level_time_used = self.time_limit - int(self.time_remaining)  # 记录用时
             if self.level_index >= len(self.game.levels) - 1:
                 self.game_state = 'all_completed'  # 最后一关，特殊通关状态
             else:
@@ -671,11 +703,13 @@ class GameScene(BaseScene):
             # 3. 标题（大标题 + 副标题）
             if self.game_state == 'all_completed':
                 title_text = "Congratulations!"
-                subtitle_text = "You've cleared all levels!"
+                # 显示总用时
+                subtitle_text = f"All levels cleared in {self.level_time_used}s!"
                 title_color = POPUP_TITLE_ALL_COMPLETED
             elif self.game_state == 'won':
                 title_text = "Level Complete!"
-                subtitle_text = "Good job!"
+                # 显示本关用时
+                subtitle_text = f"Time: {self.level_time_used}s"
                 title_color = POPUP_TITLE_WON
             else:  # lost
                 title_text = "Game Over"
@@ -869,11 +903,11 @@ class GameScene(BaseScene):
         # 1. 绘制顶部浅灰背景
         top_rect = pygame.Rect(0, 0, SCREEN_WIDTH, TOP_BAR_HEIGHT)
         pygame.draw.rect(self.game.screen, STATUS_BAR_COLOR, top_rect)
-        
-        # 状态栏总宽度，分为三等份
-        section_width = SCREEN_WIDTH // 3
+
+        # 状态栏总宽度，分为四等份
+        section_width = SCREEN_WIDTH // 4
         y_center = TOP_BAR_HEIGHT // 2
-        
+
         # === 左侧：绘制关卡进度 (旗子 + 数字) ===
         current_level = self.level_index + 1
         level_text = self.ui_font.render(f"{current_level}", True, STATUS_TEXT_COLOR)
@@ -881,22 +915,49 @@ class GameScene(BaseScene):
         self.game.screen.blit(self.icon_level, (x_level, y_center - self.icon_level.get_height() // 2))
         self.game.screen.blit(level_text, (x_level + self.icon_level.get_width() + ICON_SPACING, y_center - level_text.get_height() // 2))
 
-        # === 中间：绘制剩余步数 (箭头 + 数字) ===
+        # === 中间偏左：绘制倒计时 (时钟图标 + 时间) ===
+        # 格式化时间为 MM:SS
+        minutes = int(self.time_remaining) // 60
+        seconds = int(self.time_remaining) % 60
+        time_str = f"{minutes:02d}:{seconds:02d}"
+        
+        # 根据剩余时间判断颜色
+        if self.time_remaining <= TIME_WARNING_THRESHOLD:
+            time_color = TIME_WARNING_COLOR
+        else:
+            time_color = STATUS_TEXT_COLOR
+            
+        time_text = self.ui_font.render(time_str, True, time_color)
+        
+        # 使用加载好的 clock.png 图标
+        clock_icon = self.icon_clock
+        
+        # 计算倒计时组合的总宽度
+        time_group_width = clock_icon.get_width() + ICON_SPACING + time_text.get_width()
+        
+        # 将倒计时区域放置在屏幕中线偏左的位置
+        x_time = SCREEN_WIDTH // 2 - 60 - time_group_width // 2
+        
+        self.game.screen.blit(clock_icon, (x_time, y_center - clock_icon.get_height() // 2))
+        self.game.screen.blit(time_text, (x_time + clock_icon.get_width() + ICON_SPACING, y_center - time_text.get_height() // 2))
+
+        # === 中间偏右：绘制剩余步数 (箭头 + 数字) ===
         arrows_left = self.max_arrows - len(self.placed_arrows)
         arrow_text = self.ui_font.render(f"{arrows_left}", True, STATUS_TEXT_COLOR)
-        x_arrow = SCREEN_WIDTH // 2 - (self.icon_arrow.get_width() + ICON_SPACING + arrow_text.get_width()) // 2
+        x_arrow = (SCREEN_WIDTH // 2 + 40) - (self.icon_arrow.get_width() + ICON_SPACING + arrow_text.get_width()) // 2
         # 直接绘制原图，不进行任何染色
         self.game.screen.blit(self.icon_arrow, (x_arrow, y_center - self.icon_arrow.get_height() // 2))
         self.game.screen.blit(arrow_text, (x_arrow + self.icon_arrow.get_width() + ICON_SPACING, y_center - arrow_text.get_height() // 2))
 
         # === 右侧：绘制生命值 (实心/空心爱心) ===
         hearts_container_w = self.max_mistakes * (self.icon_heart.get_width() + 4)
-        x_hearts_start = SCREEN_WIDTH - section_width // 2 - hearts_container_w // 2
+        
+        # 将生命值区域放置在屏幕最右侧，留出 20 像素的右边距
+        x_hearts_start = SCREEN_WIDTH - 20 - hearts_container_w
         
         for i in range(self.max_mistakes):
             pos_x = x_hearts_start + i * (self.icon_heart.get_width() + 4)
             pos_y = y_center - self.icon_heart.get_height() // 2
-            
             # 判断绘制实心还是空心爱心
             if i < (self.max_mistakes - self.mistake_count):
                 # 剩余生命，绘制实心爱心

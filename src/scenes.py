@@ -239,20 +239,21 @@ class GameScene(BaseScene):
         self.popup_x = (SCREEN_WIDTH - self.popup_width) // 2
         self.popup_y = (SCREEN_HEIGHT - self.popup_height) // 2
 
-        # 弹窗按钮尺寸
-        popup_btn_w = 120
-        popup_btn_h = 40
-        # "左侧" 按钮
+        btn_width = 130
+        btn_height = 45
+        center_x = SCREEN_WIDTH // 2
+        gap = 5  # 两个按钮之间的间距
         self.popup_left_btn = pygame.Rect(
-            self.popup_x + (self.popup_width - popup_btn_w * 2 - 20) // 2,
-            self.popup_y + self.popup_height - 60,
-            popup_btn_w, popup_btn_h
+            center_x - gap - btn_width,
+            self.popup_y + self.popup_height - btn_height - 20,
+            btn_width,
+            btn_height
         )
-        # "右侧" 按钮
         self.popup_right_btn = pygame.Rect(
-            self.popup_x + (self.popup_width - popup_btn_w * 2 - 20) // 2 + popup_btn_w + 20,
-            self.popup_y + self.popup_height - 60,
-            popup_btn_w, popup_btn_h
+            center_x + gap,
+            self.popup_y + self.popup_height - btn_height - 20,
+            btn_width,
+            btn_height
         )
 
         # === 加载顶部状态栏图标 ===
@@ -379,26 +380,25 @@ class GameScene(BaseScene):
                 # 点击左侧按钮
                 if self.popup_left_btn.collidepoint(event.pos):
                     if self.game_state == 'won':
-                        # 胜利时，左侧按钮是 "Return"
                         self.game.scene_manager.reset_to_start()
+                    elif self.game_state == 'all_completed':
+                        # 全通关时，左侧按钮改为跳转到关卡选择界面
+                        self.game.scene_manager.switch_scene('level_select')
                     else:
-                        # 失败或全通关时，左侧按钮是 "Return"
                         self.game.scene_manager.reset_to_start()
                     return
 
                 # 点击右侧按钮
                 if self.popup_right_btn.collidepoint(event.pos):
                     if self.game_state == 'won':
-                        # 胜利时，右侧按钮是 "Next"
                         self.level_index += 1
                         self.load_level_data()
                         self.game_state = 'playing'
                     elif self.game_state == 'lost':
-                        # 失败时，右侧按钮是 "Retry"
                         self.load_level_data()
                         self.game_state = 'playing'
                     else:
-                        # 全通关时，右侧按钮也是 "Return"
+                        # 全通关时，右侧按钮是 "Return"
                         self.game.scene_manager.reset_to_start()
                     return
 
@@ -612,6 +612,8 @@ class GameScene(BaseScene):
 
         # === 弹窗绘制（仅在 won 或 lost 或 all_completed 状态下显示）===
         if self.game_state in ('won', 'lost', 'all_completed'):
+            mouse_pos = pygame.mouse.get_pos()
+        
             # 1. 半透明遮罩
             overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
             overlay.set_alpha(150)
@@ -650,14 +652,20 @@ class GameScene(BaseScene):
             # 4. 按钮
             if self.game_state == 'all_completed':
                 # --- 全通关状态 ---
-                # 左侧按钮: Return
-                pygame.draw.rect(self.screen, BTN_BACK, self.popup_left_btn, border_radius=8)
-                return_text = self.btn_font.render("Return", True, TEXT_DARK_BG)
-                return_text_rect = return_text.get_rect(center=self.popup_left_btn.center)
-                self.screen.blit(return_text, return_text_rect)
+                # 左侧按钮: Select Level
+                select_color = BTN_SELECT_LEVEL
+                if self.popup_left_btn.collidepoint(mouse_pos):
+                    select_color = BTN_SELECT_LEVEL_HOVER
+                pygame.draw.rect(self.screen, select_color, self.popup_left_btn, border_radius=8)
+                select_text = self.btn_font.render("Select Level", True, TEXT_DARK_BG)
+                select_text_rect = select_text.get_rect(center=self.popup_left_btn.center)
+                self.screen.blit(select_text, select_text_rect)
 
                 # 右侧按钮: Return
-                pygame.draw.rect(self.screen, BTN_BACK, self.popup_right_btn, border_radius=8)
+                return_color = BTN_BACK
+                if self.popup_right_btn.collidepoint(mouse_pos):
+                    return_color = return_color.lerp(pygame.Color('white'), 0.2)
+                pygame.draw.rect(self.screen, return_color, self.popup_right_btn, border_radius=8)
                 return_text = self.btn_font.render("Return", True, TEXT_DARK_BG)
                 return_text_rect = return_text.get_rect(center=self.popup_right_btn.center)
                 self.screen.blit(return_text, return_text_rect)

@@ -194,7 +194,7 @@ class LevelSelectScene(BaseScene):
         pygame.draw.rect(self.screen, color, self.back_btn, border_radius=8)
         pygame.draw.rect(self.screen, TEXT_LIGHT_BG, self.back_btn, width=2, border_radius=8)
 
-        back_text = self.btn_font.render("Back", True, TEXT_DARK_BG)
+        back_text = self.btn_font.render("Return", True, TEXT_LIGHT_BG)
         back_text_rect = back_text.get_rect(center=self.back_btn.center)
         self.screen.blit(back_text, back_text_rect)
 
@@ -216,10 +216,21 @@ class GameScene(BaseScene):
         self.ui_font = pygame.font.Font(font_path, UI_FONT_SIZE)
         self.btn_font = pygame.font.Font(font_path, BTN_FONT_SIZE)
 
-        # 2. 初始化重新开始按钮区域
+        # === 底部控制按钮 ===
         btn_w, btn_h = 140, 40
-        self.restart_btn = pygame.Rect(0, 0, btn_w, btn_h)
-        
+        btn_y = SCREEN_HEIGHT - 60
+        btn_w = 100
+        btn_h = 40
+        gap = 5  # 按钮间距
+
+        # 计算三个按钮的总宽度和起始 x 坐标
+        total_width = btn_w * 3 + gap * 2
+        start_x = (SCREEN_WIDTH - total_width) // 2
+
+        self.return_btn = pygame.Rect(start_x, btn_y, btn_w, btn_h)
+        self.restart_btn = pygame.Rect(start_x + btn_w + gap, btn_y, btn_w, btn_h)
+        self.select_btn = pygame.Rect(start_x + (btn_w + gap) * 2, btn_y, btn_w, btn_h)
+
         # === 晃动动画状态 ===
         self.shaking_arrow = None      # 当前晃动的箭头坐标 (row, col)
         self.shake_timer = 0           # 晃动剩余时间（秒）
@@ -339,10 +350,21 @@ class GameScene(BaseScene):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mx, my = event.pos
 
-            # 1. 底部"Restart"按钮（始终有效）
+            # 1. === 底部按钮处理（始终有效）===
+            # Return 按钮 - 返回关卡选择界面
+            if self.return_btn.collidepoint(event.pos):
+                self.game.scene_manager.switch_scene('level_select')
+                return
+
+            # Restart 按钮 - 重新开始当前关卡
             if self.restart_btn.collidepoint(event.pos):
                 self.load_level_data()
                 self.game_state = 'playing'
+                return
+
+            # Select 按钮 - 跳转到关卡选择界面
+            if self.select_btn.collidepoint(event.pos):
+                self.game.scene_manager.switch_scene('level_select')
                 return
 
             # 2. 游戏未结束时，处理棋盘点击
@@ -350,9 +372,6 @@ class GameScene(BaseScene):
                 # 如果已经有箭头在移动，则忽略新的点击
                 if self.moving_arrow is not None:
                     return
-
-                rel_x = mx - self.offset_x
-                rel_y = my - self.offset_y
                 
                 # 遍历所有格子，用 collidepoint 精确检测点击了哪个格子
                 for r in range(self.rows):
@@ -591,7 +610,6 @@ class GameScene(BaseScene):
             self.moving_arrow = None
 
     def draw(self):
-        screen_w, screen_h = self.screen.get_size()
         self.screen.fill(BG_LIGHT)
         
         # --- 绘制棋盘 ---
@@ -608,7 +626,7 @@ class GameScene(BaseScene):
 
         self.draw_top_bar()
 
-        self.draw_restart_btn()
+        self.draw_bottom_buttons()
 
         # === 弹窗绘制（仅在 won 或 lost 或 all_completed 状态下显示）===
         if self.game_state in ('won', 'lost', 'all_completed'):
@@ -831,29 +849,55 @@ class GameScene(BaseScene):
                 if hasattr(self, 'icon_heart_empty'):
                     self.game.screen.blit(self.icon_heart_empty, (pos_x, pos_y))
 
-    def draw_restart_btn(self):
-        """绘制底部重新开始按钮"""
+    def draw_bottom_buttons(self):
+        """绘制底部控制按钮（Return + Restart + Select）"""
         # 1. 绘制底部浅灰背景
         bottom_rect = pygame.Rect(0, SCREEN_HEIGHT - BOTTOM_BAR_HEIGHT, SCREEN_WIDTH, BOTTOM_BAR_HEIGHT)
         pygame.draw.rect(self.game.screen, STATUS_BAR_COLOR, bottom_rect)
-        
-        # 2. 更新 restart_btn 的位置以适配底部栏（水平垂直居中）
+
+        # 2. 更新三个按钮的位置（水平居中排列）
         btn_w, btn_h = self.restart_btn.size
-        self.restart_btn.topleft = (
-            SCREEN_WIDTH // 2 - btn_w // 2, 
-            SCREEN_HEIGHT - BOTTOM_BAR_HEIGHT + (BOTTOM_BAR_HEIGHT - btn_h) // 2
-        )
-        
-        # 3. 绘制按钮底色（使用 settings.py 中已定义的 BTN_RESTART）
-        pygame.draw.rect(self.game.screen, BTN_RESTART, self.restart_btn, border_radius=8)
-        
-        # 4. 绘制按钮边框（可选：用浅灰色描边，或者干脆不要边框更简洁）
+        gap = 15
+        total_width = btn_w * 3 + gap * 2
+        start_x = (SCREEN_WIDTH - total_width) // 2
+        btn_y = SCREEN_HEIGHT - BOTTOM_BAR_HEIGHT + (BOTTOM_BAR_HEIGHT - btn_h) // 2
+
+        self.return_btn.topleft = (start_x, btn_y)
+        self.restart_btn.topleft = (start_x + btn_w + gap, btn_y)
+        self.select_btn.topleft = (start_x + (btn_w + gap) * 2, btn_y)
+
+        # 3. 获取鼠标位置用于悬停检测
+        mouse_pos = pygame.mouse.get_pos()
+
+        # 4. 绘制 Return 按钮
+        return_color = BTN_BACK
+        if self.return_btn.collidepoint(mouse_pos):
+            return_color = return_color.lerp(pygame.Color('white'), 0.2)
+        pygame.draw.rect(self.game.screen, return_color, self.return_btn, border_radius=8)
+        pygame.draw.rect(self.game.screen, pygame.Color('#C0C0C0'), self.return_btn, 2, border_radius=8)
+        return_text = self.btn_font.render("Return", True, TEXT_LIGHT_BG)
+        return_text_rect = return_text.get_rect(center=self.return_btn.center)
+        self.game.screen.blit(return_text, return_text_rect)
+
+        # 5. 绘制 Restart 按钮
+        restart_color = BTN_RESTART
+        if self.restart_btn.collidepoint(mouse_pos):
+            restart_color = restart_color.lerp(pygame.Color('white'), 0.2)
+        pygame.draw.rect(self.game.screen, restart_color, self.restart_btn, border_radius=8)
         pygame.draw.rect(self.game.screen, pygame.Color('#C0C0C0'), self.restart_btn, 2, border_radius=8)
-        
-        # 5. 绘制按钮文字
-        btn_text = self.btn_font.render("Restart", True, TEXT_LIGHT_BG)
-        text_rect = btn_text.get_rect(center=self.restart_btn.center)
-        self.game.screen.blit(btn_text, text_rect)
+        restart_text = self.btn_font.render("Restart", True, TEXT_LIGHT_BG)
+        restart_text_rect = restart_text.get_rect(center=self.restart_btn.center)
+        self.game.screen.blit(restart_text, restart_text_rect)
+
+        # 6. 绘制 Select 按钮
+        select_color = BTN_SELECT_LEVEL
+        if self.select_btn.collidepoint(mouse_pos):
+            select_color = select_color.lerp(pygame.Color('white'), 0.2)
+        pygame.draw.rect(self.game.screen, select_color, self.select_btn, border_radius=8)
+        pygame.draw.rect(self.game.screen, pygame.Color('#C0C0C0'), self.select_btn, 2, border_radius=8)
+        select_text = self.btn_font.render("Select", True, TEXT_LIGHT_BG)
+        select_text_rect = select_text.get_rect(center=self.select_btn.center)
+        self.game.screen.blit(select_text, select_text_rect)
 
 class SceneManager:
     """场景管理器：负责切换和更新当前场景"""

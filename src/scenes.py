@@ -291,6 +291,7 @@ class GameScene(BaseScene):
         # 用于存储正在移动的箭头信息，结构为：
         # {'start_pos': (row, col), 'current_pos': (x, y), 'direction': dir}
         self.moving_arrow = None
+        self.hover_cell = None
 
         # 初始化关卡数据
         self.load_level_data()
@@ -478,6 +479,21 @@ class GameScene(BaseScene):
         # 获取鼠标绝对坐标
         self.mouse_pos = pygame.mouse.get_pos()
 
+        # === 新增：检测鼠标悬停的单元格 ===
+        self.hover_cell = None
+        if self.game_state == 'playing':
+            mx, my = self.mouse_pos
+            for r in range(self.rows):
+                for c in range(self.cols):
+                    cell_x = self.offset_x + c * (self.cell_size + CELL_GAP)
+                    cell_y = self.offset_y + r * (self.cell_size + CELL_GAP)
+                    cell_rect = pygame.Rect(cell_x, cell_y, self.cell_size, self.cell_size)
+                    if cell_rect.collidepoint(mx, my):
+                        self.hover_cell = (r, c)
+                        break
+                if self.hover_cell is not None:
+                    break
+
         # 处理箭头移动动画
         if self.moving_arrow is not None and self.game_state == 'playing':
             self._update_moving_arrow(dt)
@@ -611,8 +627,20 @@ class GameScene(BaseScene):
         
         # --- 绘制棋盘 ---
         self._draw_board()
+
+        # === 绘制悬停阴影 ===
+        if self.hover_cell is not None and self.game_state == 'playing':
+            r, c = self.hover_cell
+            cell_x = self.offset_x + c * (self.cell_size + CELL_GAP)
+            cell_y = self.offset_y + r * (self.cell_size + CELL_GAP)
+            hover_rect = pygame.Rect(cell_x, cell_y, self.cell_size, self.cell_size)
+            
+            # 绘制半透明阴影层（灰色，透明度约40%）
+            shadow_surface = pygame.Surface((self.cell_size, self.cell_size), pygame.SRCALPHA)
+            shadow_surface.fill((100, 100, 100, 40))  # RGBA，最后一个是透明度
+            self.game.screen.blit(shadow_surface, hover_rect.topleft)
         
-        # === 新增：绘制正在移动的箭头 ===
+        # === 绘制正在移动的箭头 ===
         if self.moving_arrow is not None:
             arrow = self.moving_arrow
             direction = arrow['direction']

@@ -78,6 +78,7 @@ class GameScene(BaseScene):
         self.shake_timer = 0           # 晃动剩余时间（秒）
         self.shake_intensity = 4       # 晃动幅度（像素）
         self.shake_frequency = 30      # 晃动频率（Hz，控制正弦波速度）
+        self.shake_should_check_game_over = False
 
         # === 游戏状态管理 ===
         # 状态分为 'playing' (游戏中), 'won' (通关), 'lost' (失败)
@@ -120,16 +121,21 @@ class GameScene(BaseScene):
         self.icon_heart_empty = pygame.image.load(os.path.join(BASE_DIR, 'assets', 'icons', 'heart-empty.png')).convert_alpha()
         self.icon_heart_empty = pygame.transform.scale(self.icon_heart_empty, (ICON_SIZE, ICON_SIZE))
 
-        # === 新增：移动动画配置 ===
+        # === 移动动画配置 ===
         self.move_speed = 600  # 像素/秒，可以调整这个值来改变箭头飞行速度
 
-        # === 新增：移动状态追踪 ===
+        # === 移动状态追踪 ===
         # 用于存储正在移动的箭头信息，结构为：
         # {'start_pos': (row, col), 'current_pos': (x, y), 'direction': dir}
         self.moving_arrow = None
 
         # 初始化关卡数据
         self.load_level_data()
+
+        # 预生成每种方向箭头的碰撞掩码（必须在 load_level_data 之后，确保 arrow_images 已加载）
+        self.arrow_masks = {}
+        for direction in [DIR_UP, DIR_DOWN, DIR_LEFT, DIR_RIGHT]:
+            self.arrow_masks[direction] = pygame.mask.from_surface(self.arrow_images[direction])
 
     def load_level_data(self):
         """提取当前关卡的网格和尺寸，并计算布局参数"""
@@ -285,10 +291,8 @@ class GameScene(BaseScene):
             self.mistake_count += 1
             print(f"❌ 碰撞！({row},{col}) 路径被阻挡。")
             
-            # 判定失败
-            if self.mistake_count >= self.max_mistakes:
-                print("❌ 游戏失败！等待玩家操作。")
-                self.game_state = 'lost'
+            # 修改：先不切 game_state，等晃动播完再判定
+            self.shake_should_check_game_over = True
 
     def update(self, dt):
         """更新场景逻辑"""
@@ -304,7 +308,17 @@ class GameScene(BaseScene):
             self.shake_timer -= dt
             if self.shake_timer <= 0:
                 self.shake_timer = 0
-                self.shaking_arrow = None
+
+                # 晃动播完后，再判定是否 Game Over
+                if getattr(self, "shaking_arrow", None) is not None:
+                    self.shaking_arrow = None
+
+                if getattr(self, "shake_should_check_game_over", False):
+                    self.shake_should_check_game_over = False
+
+                    if self.mistake_count >= self.max_mistakes:
+                        print("❌ 游戏失败！等待玩家操作。")
+                        self.game_state = 'lost'
 
     def _update_moving_arrow(self, dt):
         """处理移动中箭头的逻辑"""
@@ -327,74 +341,80 @@ class GameScene(BaseScene):
             
         arrow['current_pos'] = (curr_x, curr_y)
 
-        # 2. 计算箭头的像素边界（用于碰撞检测）
-        half = self.cell_size // 2
-        arrow_left = curr_x - half
-        arrow_right = curr_x + half
-        arrow_top = curr_y - half
-        arrow_bottom = curr_y + half
+        # 2. 计算移动箭头的包围盒和掩码
+        moving_img = self.arrow_images[direction]
+        moving_mask = self.arrow_masks[direction]
+        moving_w, moving_h = moving_img.get_size()
+        moving_left = curr_x - moving_w // 2
+        moving_top = curr_y - moving_h // 2
 
-        # 3. 碰撞检测：检查箭头是否与路径上的其他箭头重叠
-        # 计算箭头中心所在的逻辑格子
-        center_col = (curr_x - self.offset_x) // (self.cell_size + CELL_GAP)
-        center_row = (curr_y - self.offset_y) // (self.cell_size + CELL_GAP)
-        
-        # 沿移动方向检查前方格子是否有箭头
+        # 3. 沿移动方向扫描，找到第一个有箭头的格子
         dr = {DIR_UP: -1, DIR_DOWN: 1, DIR_LEFT: 0, DIR_RIGHT: 0}
         dc = {DIR_UP: 0, DIR_DOWN: 0, DIR_LEFT: -1, DIR_RIGHT: 1}
         
-        # 检查前方1-2个格子（覆盖箭头尺寸范围）
-        for step in range(1, 3):
-            check_r = int(center_row) + dr[direction] * step
-            check_c = int(center_col) + dc[direction] * step
+        target_r, target_c = None, None
+        for step in range(1, max(self.rows, self.cols)):
+            check_r = start_row + dr[direction] * step
+            check_c = start_col + dc[direction] * step
             
-            # 跳过起点格子
-            if (check_r, check_c) == (start_row, start_col):
-                continue
+            # 超出棋盘边界，停止扫描
+            if not (0 <= check_r < self.rows and 0 <= check_c < self.cols):
+                break
             
-            # 检查是否在棋盘范围内且有箭头
-            if 0 <= check_r < self.rows and 0 <= check_c < self.cols:
-                if self.grid_map[check_r][check_c] != 0:
-                    # 计算被碰撞箭头的像素位置
-                    other_x = self.offset_x + check_c * (self.cell_size + CELL_GAP) + self.cell_size // 2
-                    other_y = self.offset_y + check_r * (self.cell_size + CELL_GAP) + self.cell_size // 2
-                    other_half = self.cell_size // 2
-                    
-                    # 像素级矩形碰撞检测
-                    if (arrow_right > other_x - other_half and 
-                        arrow_left < other_x + other_half and
-                        arrow_bottom > other_y - other_half and 
-                        arrow_top < other_y + other_half):
-                        # 发生碰撞！触发晃动并返回原位
-                        self.check_arrow_path('blocked', start_row, start_col)
-                        self.moving_arrow = None
-                        return
-
-        # 4. 边界检测：用像素坐标判断是否完全飞出棋盘
-        board_left = self.offset_x
-        board_right = self.offset_x + self.cols * (self.cell_size + CELL_GAP) - CELL_GAP
-        board_top = self.offset_y
-        board_bottom = self.offset_y + self.rows * (self.cell_size + CELL_GAP) - CELL_GAP
+            # 找到第一个有箭头的格子
+            if self.grid_map[check_r][check_c] != 0:
+                target_r, target_c = check_r, check_c
+                break
         
-        # 箭头完全飞出棋盘才判定为成功
-        if direction == DIR_UP and arrow_bottom < board_top:
+        # 4. 如果找到了目标箭头，做像素级碰撞检测
+        if target_r is not None:
+            other_dir = self.grid_map[target_r][target_c]
+            
+            # 计算静止箭头的像素位置
+            other_x = self.offset_x + target_c * (self.cell_size + CELL_GAP) + self.cell_size // 2
+            other_y = self.offset_y + target_r * (self.cell_size + CELL_GAP) + self.cell_size // 2
+            
+            other_img = self.arrow_images[other_dir]
+            other_mask = self.arrow_masks[other_dir]
+            other_w, other_h = other_img.get_size()
+            other_left = other_x - other_w // 2
+            other_top = other_y - other_h // 2
+            
+            # 像素级碰撞检测
+            offset_x = int(moving_left - other_left)
+            offset_y = int(moving_top - other_top)
+            
+            overlap_point = moving_mask.overlap(other_mask, (offset_x, offset_y))
+            
+            if overlap_point is not None:
+                self.check_arrow_path('blocked', start_row, start_col)
+                self.moving_arrow = None
+                return
+
+        # 5. 边界检测：判断是否完全飞出屏幕
+        half_w = moving_w // 2
+        half_h = moving_h // 2
+        arrow_left = curr_x - half_w
+        arrow_right = curr_x + half_w
+        arrow_top = curr_y - half_h
+        arrow_bottom = curr_y + half_h
+        
+        if direction == DIR_UP and arrow_bottom < 0:
             self.check_arrow_path('clear', start_row, start_col)
             self.moving_arrow = None
-        elif direction == DIR_DOWN and arrow_top > board_bottom:
+        elif direction == DIR_DOWN and arrow_top > SCREEN_HEIGHT:
             self.check_arrow_path('clear', start_row, start_col)
             self.moving_arrow = None
-        elif direction == DIR_LEFT and arrow_right < board_left:
+        elif direction == DIR_LEFT and arrow_right < 0:
             self.check_arrow_path('clear', start_row, start_col)
             self.moving_arrow = None
-        elif direction == DIR_RIGHT and arrow_left > board_right:
+        elif direction == DIR_RIGHT and arrow_left > SCREEN_WIDTH:
             self.check_arrow_path('clear', start_row, start_col)
             self.moving_arrow = None
 
     def draw(self):
         screen_w, screen_h = self.screen.get_size()
         self.screen.fill(BG_LIGHT)
-        
-        self.draw_top_bar()
         
         # --- 绘制棋盘 ---
         self._draw_board()
@@ -407,6 +427,8 @@ class GameScene(BaseScene):
             # 创建一个临时 rect 仅用于确定箭头大小，位置由 pos 参数决定
             temp_rect = pygame.Rect(0, 0, self.cell_size, self.cell_size)
             self._draw_arrow(temp_rect, direction, pos=pos)
+
+        self.draw_top_bar()
         
         self.draw_restart_btn()
 

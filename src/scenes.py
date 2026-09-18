@@ -91,18 +91,18 @@ class GameScene(BaseScene):
         # 弹窗居中坐标
         self.popup_x = (SCREEN_WIDTH - self.popup_width) // 2
         self.popup_y = (SCREEN_HEIGHT - self.popup_height) // 2
-        
+
         # 弹窗按钮尺寸
         popup_btn_w = 120
         popup_btn_h = 40
-        # "Retry" 按钮居中偏左
-        self.popup_retry_btn = pygame.Rect(
+        # "左侧" 按钮
+        self.popup_left_btn = pygame.Rect(
             self.popup_x + (self.popup_width - popup_btn_w * 2 - 20) // 2,
             self.popup_y + self.popup_height - 60,
             popup_btn_w, popup_btn_h
         )
-        # "Next Level" 按钮居中偏右
-        self.popup_next_btn = pygame.Rect(
+        # "右侧" 按钮
+        self.popup_right_btn = pygame.Rect(
             self.popup_x + (self.popup_width - popup_btn_w * 2 - 20) // 2 + popup_btn_w + 20,
             self.popup_y + self.popup_height - 60,
             popup_btn_w, popup_btn_h
@@ -222,21 +222,27 @@ class GameScene(BaseScene):
                         
             # 3. === 弹窗按钮处理（仅在 won/lost 状态下有效）===
             if self.game_state in ('won', 'lost'):
-                # Retry 按钮：重新加载当前关卡
-                if self.popup_retry_btn.collidepoint(event.pos):
-                    self.load_level_data()
-                    self.game_state = 'playing'
-                    return
-
-                # 第二个按钮：won → 下一关，lost → 返回主菜单
-                if self.popup_next_btn.collidepoint(event.pos):
+                # 点击左侧按钮
+                if self.popup_left_btn.collidepoint(event.pos):
                     if self.game_state == 'won':
+                        # 胜利时，左侧按钮是 "Next"
                         self.level_index += 1
                         self.load_level_data()
                         self.game_state = 'playing'
                     else:
-                        # 返回开始界面
+                        # 失败时，左侧按钮是 "Return"
                         self.game.scene_manager.reset_to_start()
+                    return
+
+                # 点击右侧按钮
+                if self.popup_right_btn.collidepoint(event.pos):
+                    if self.game_state == 'won':
+                        # 胜利时，右侧按钮是 "Return"
+                        self.game.scene_manager.reset_to_start()
+                    else:
+                        # 失败时，右侧按钮是 "Retry"
+                        self.load_level_data()
+                        self.game_state = 'playing'
                     return
 
     def get_arrow_status(self, row, col):
@@ -457,23 +463,33 @@ class GameScene(BaseScene):
             self.screen.blit(title, title_rect)
 
             # 4. 按钮
-            # Retry 按钮（两种状态都显示）
-            pygame.draw.rect(self.screen, BTN_RETRY, self.popup_retry_btn, border_radius=8)
-            retry_text = self.btn_font.render("Retry", True, TEXT_DARK_BG)
-            retry_text_rect = retry_text.get_rect(center=self.popup_retry_btn.center)
-            self.screen.blit(retry_text, retry_text_rect)
-
-            # 第二个按钮：won 显示 Next Level，lost 显示 Back to Menu
             if self.game_state == 'won':
-                pygame.draw.rect(self.screen, BTN_NEXT, self.popup_next_btn, border_radius=8)
+                # --- 胜利状态 ---
+                # 左侧按钮: Next
+                pygame.draw.rect(self.screen, BTN_NEXT, self.popup_left_btn, border_radius=8)
                 next_text = self.btn_font.render("Next", True, TEXT_DARK_BG)
-                next_text_rect = next_text.get_rect(center=self.popup_next_btn.center)
+                next_text_rect = next_text.get_rect(center=self.popup_left_btn.center)
                 self.screen.blit(next_text, next_text_rect)
-            else:
-                pygame.draw.rect(self.screen, BTN_BACK, self.popup_next_btn, border_radius=8)
-                back_text = self.btn_font.render("Return", True, TEXT_DARK_BG)
-                back_text_rect = back_text.get_rect(center=self.popup_next_btn.center)
-                self.screen.blit(back_text, back_text_rect)
+
+                # 右侧按钮: Return
+                pygame.draw.rect(self.screen, BTN_BACK, self.popup_right_btn, border_radius=8)
+                return_text = self.btn_font.render("Return", True, TEXT_DARK_BG)
+                return_text_rect = return_text.get_rect(center=self.popup_right_btn.center)
+                self.screen.blit(return_text, return_text_rect)
+
+            else:  # self.game_state == 'lost'
+                # --- 失败状态 ---
+                # 左侧按钮: Return
+                pygame.draw.rect(self.screen, BTN_BACK, self.popup_left_btn, border_radius=8)
+                return_text = self.btn_font.render("Return", True, TEXT_DARK_BG)
+                return_text_rect = return_text.get_rect(center=self.popup_left_btn.center)
+                self.screen.blit(return_text, return_text_rect)
+
+                # 右侧按钮: Retry
+                pygame.draw.rect(self.screen, BTN_RETRY, self.popup_right_btn, border_radius=8)
+                retry_text = self.btn_font.render("Retry", True, TEXT_DARK_BG)
+                retry_text_rect = retry_text.get_rect(center=self.popup_right_btn.center)
+                self.screen.blit(retry_text, retry_text_rect)
 
     def _draw_board(self):
         """绘制棋盘网格及箭头"""

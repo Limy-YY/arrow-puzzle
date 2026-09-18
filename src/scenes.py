@@ -140,7 +140,7 @@ class GameScene(BaseScene):
     def load_level_data(self):
         """提取当前关卡的网格和尺寸，并计算布局参数"""
         if self.level_index >= len(self.game.levels):
-            self.level_index = 0
+            self.level_index = len(self.game.levels) - 1
             
         self.level_data = self.game.levels[self.level_index]
         
@@ -179,6 +179,13 @@ class GameScene(BaseScene):
         self.max_mistakes = self.level_data.get('max_failures', 0)
         self.placed_arrows = []
         self.mistake_count = 0
+
+    def check_level_target(self):
+        """
+        检查当前关卡目标是否达成
+        通关条件：所有箭头都已发出
+        """
+        return len(self.placed_arrows) >= self.max_arrows
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -220,8 +227,8 @@ class GameScene(BaseScene):
                                 }
                             return
                         
-            # 3. === 弹窗按钮处理（仅在 won/lost 状态下有效）===
-            if self.game_state in ('won', 'lost'):
+            # 3. === 弹窗按钮处理（仅在 won/lost/all_completed 状态下有效）===
+            if self.game_state in ('won', 'lost', 'all_completed'):
                 # 点击左侧按钮
                 if self.popup_left_btn.collidepoint(event.pos):
                     if self.game_state == 'won':
@@ -230,7 +237,7 @@ class GameScene(BaseScene):
                         self.load_level_data()
                         self.game_state = 'playing'
                     else:
-                        # 失败时，左侧按钮是 "Return"
+                        # 失败或全通关时，左侧按钮是 "Return"
                         self.game.scene_manager.reset_to_start()
                     return
 
@@ -239,10 +246,13 @@ class GameScene(BaseScene):
                     if self.game_state == 'won':
                         # 胜利时，右侧按钮是 "Return"
                         self.game.scene_manager.reset_to_start()
-                    else:
+                    elif self.game_state == 'lost':
                         # 失败时，右侧按钮是 "Retry"
                         self.load_level_data()
                         self.game_state = 'playing'
+                    else:
+                        # 全通关时，右侧按钮也是 "Return"
+                        self.game.scene_manager.reset_to_start()
                     return
 
     def get_arrow_status(self, row, col):
@@ -325,6 +335,17 @@ class GameScene(BaseScene):
                     if self.mistake_count >= self.max_mistakes:
                         print("❌ 游戏失败！等待玩家操作。")
                         self.game_state = 'lost'
+
+        # 1. 检查关卡目标是否达成
+        level_target_met = self.check_level_target()
+
+        # 2. 根据目标达成情况判定游戏状态
+        if level_target_met:
+            # 目标达成，玩家胜利
+            if self.level_index >= len(self.game.levels) - 1:
+                self.game_state = 'all_completed'  # 最后一关，特殊通关状态
+            else:
+                self.game_state = 'won'  # 普通通关状态
 
     def _update_moving_arrow(self, dt):
         """处理移动中箭头的逻辑"""
@@ -442,8 +463,8 @@ class GameScene(BaseScene):
 
         self.draw_restart_btn()
 
-        # === 弹窗绘制（仅在 won 或 lost 状态下显示）===
-        if self.game_state in ('won', 'lost'):
+        # === 弹窗绘制（仅在 won 或 lost 或 all_completed 状态下显示）===
+        if self.game_state in ('won', 'lost', 'all_completed'):
             # 1. 半透明遮罩
             overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
             overlay.set_alpha(150)
@@ -456,14 +477,36 @@ class GameScene(BaseScene):
             pygame.draw.rect(self.screen, BG_DARK, popup_rect, width=2, border_radius=12)
 
             # 3. 标题
-            title_text = "Level Complete!" if self.game_state == 'won' else "Game Over"
-            title_color = ARROW_TARGET if self.game_state == 'won' else BTN_RETRY
+            if self.game_state == 'all_completed':
+                title_text = "All Levels Complete!"
+                title_color = ARROW_TARGET
+            elif self.game_state == 'won':
+                title_text = "Level Complete!"
+                title_color = ARROW_TARGET
+            else:
+                title_text = "Game Over"
+                title_color = BTN_RETRY
+
             title = self.popup_title_font.render(title_text, True, title_color)
             title_rect = title.get_rect(center=(SCREEN_WIDTH // 2, self.popup_y + 50))
             self.screen.blit(title, title_rect)
 
             # 4. 按钮
-            if self.game_state == 'won':
+            if self.game_state == 'all_completed':
+                # --- 全通关状态 ---
+                # 左侧按钮: Return
+                pygame.draw.rect(self.screen, BTN_BACK, self.popup_left_btn, border_radius=8)
+                return_text = self.btn_font.render("Return", True, TEXT_DARK_BG)
+                return_text_rect = return_text.get_rect(center=self.popup_left_btn.center)
+                self.screen.blit(return_text, return_text_rect)
+
+                # 右侧按钮: Return
+                pygame.draw.rect(self.screen, BTN_BACK, self.popup_right_btn, border_radius=8)
+                return_text = self.btn_font.render("Return", True, TEXT_DARK_BG)
+                return_text_rect = return_text.get_rect(center=self.popup_right_btn.center)
+                self.screen.blit(return_text, return_text_rect)
+
+            elif self.game_state == 'won':
                 # --- 胜利状态 ---
                 # 左侧按钮: Next
                 pygame.draw.rect(self.screen, BTN_NEXT, self.popup_left_btn, border_radius=8)

@@ -14,7 +14,7 @@ FPS = 60
 
 # 莫兰迪配色方案 (RGB)
 BG_DARK = pygame.Color('#555555')
-BG_LIGHT = pygame.Color('#F2EFE4')
+BG_LIGHT = pygame.Color("#FFFFFF")
 BG_GRID = pygame.Color('#D6D6D6')
 
 # 箭头颜色
@@ -46,8 +46,12 @@ DIR_RIGHT = 4
 GRID_PADDING = 20       # 网格距离屏幕边缘的间距
 CELL_GAP = 2            # 单元格之间的间距
 ARROW_RATIO = 0.6       # 箭头大小占单元格的比例
-GRID_BG_COLOR = pygame.Color('#E8E8E8')  # 棋盘大底板的颜色（浅灰）
-CELL_BG_COLOR = pygame.Color('#FFFFFF')  # 单元格内部的颜色（纯白）
+
+GRID_BG_COLOR = pygame.Color('#FFFFFF')  # 棋盘大底板的颜色（纯白，与开始界面统一）
+CELL_BG_COLOR = pygame.Color('#FFFFFF')  # 单元格浅色格（纯白）
+CELL_BG_ALT = pygame.Color('#F6F6F6')    # 单元格深色格（极浅灰，形成棋盘格）
+CELL_BORDER_COLOR = pygame.Color('#E8E8E8')  # 棋盘外边框颜色（浅灰）
+BORDER_LINE_COLOR = pygame.Color('#000000')
 
 # === UI 布局数值常量 ===
 TOP_BAR_HEIGHT = 50

@@ -58,6 +58,7 @@ class GameScene(BaseScene):
     def __init__(self, game, font_bold, font_regular):
         super().__init__(game)
         self.level_index = 0
+        self.game = game
         
         # 1. 初始化所有需要的字体
         self.font_bold = font_bold
@@ -330,23 +331,43 @@ class GameScene(BaseScene):
                 y = self.offset_y + r * (self.cell_size + CELL_GAP)
                 cell_rect = pygame.Rect(x, y, self.cell_size, self.cell_size)
                 
-                # 绘制单元格底色和边框
-                pygame.draw.rect(self.screen, CELL_BG_COLOR, cell_rect)
-                pygame.draw.rect(self.screen, BG_GRID, cell_rect, 1)
+                # 1. 根据行列之和判断是否绘制交替颜色，实现棋盘格效果
+                if (r + c) % 2 == 0:
+                    color = CELL_BG_COLOR
+                else:
+                    color = CELL_BG_ALT
+                pygame.draw.rect(self.screen, color, cell_rect)
                 
-                # 绘制当前格子里的箭头
-                if self.grid_map[r][c] != 0:
-                    self._draw_arrow(x, y, self.grid_map[r][c], row=r, col=c)
+                # 2. 绘制当前格子里的箭头
+                arrow_dir = self.grid_map[r][c]
+                if arrow_dir != 0:
+                    # 传入 rect，让箭头绘制方法能够根据格子大小缩放
+                    self._draw_arrow(cell_rect, arrow_dir)
 
-    def _draw_arrow(self, x, y, direction, row=None, col=None):
-        """使用PNG图标绘制箭头，支持晃动效果"""
+        # 在循环结束后，绘制棋盘外边框
+        board_rect = pygame.Rect(
+            self.offset_x - CELL_GAP,
+            self.offset_y - CELL_GAP,
+            self.cols * (self.cell_size + CELL_GAP) + CELL_GAP,
+            self.rows * (self.cell_size + CELL_GAP) + CELL_GAP
+        )
+        # 2. 绘制外层大圆角线（向外扩 3 像素，完全在棋盘外部）
+        outer_rect = board_rect.inflate(10, 10)
+        pygame.draw.rect(self.screen, BORDER_LINE_COLOR, outer_rect, width=2, border_radius=8)
+        
+        # 3. 绘制内层圆角线（紧贴棋盘边缘，同样不侵入棋盘内部）
+        inner_rect = board_rect.inflate(0, 0) 
+        pygame.draw.rect(self.screen, BORDER_LINE_COLOR, inner_rect, width=2, border_radius=8)
+
+    def _draw_arrow(self, rect, direction, row=None, col=None):
+        """使用PNG图标绘制箭头，支持晃动效果并自动上色"""
         img = self.arrow_images.get(direction)
         if img is None:
             return
         
         # 计算中心坐标
-        center_x = x + self.cell_size // 2
-        center_y = y + self.cell_size // 2
+        center_x = rect.centerx
+        center_y = rect.centery
         
         # 如果当前箭头正在晃动，计算水平偏移量
         offset_x = 0
@@ -355,7 +376,6 @@ class GameScene(BaseScene):
             self.shaking_arrow == (row, col) and
             self.shake_timer > 0):
             # 使用正弦波产生周期性偏移
-            
             progress = 1.0 - (self.shake_timer / 0.3)  # 0 → 1
             # 衰减因子：晃动逐渐减弱
             decay = 1.0 - progress
@@ -363,7 +383,31 @@ class GameScene(BaseScene):
                         * self.shake_intensity * decay)
         
         img_rect = img.get_rect(center=(center_x + offset_x, center_y))
-        self.screen.blit(img, img_rect)
+        
+        # --- 给白色箭头图片上莫兰迪色 ---
+        # 映射方向与对应的莫兰迪颜色 (复用你 settings.py 里定义的)
+        color_map = {
+            DIR_UP: ARROW_UP,
+            DIR_DOWN: ARROW_DOWN,
+            DIR_LEFT: ARROW_LEFT,
+            DIR_RIGHT: ARROW_RIGHT
+        }
+        color = color_map.get(direction)
+        
+        if color:
+            # 创建一个临时 Surface 用于填色
+            temp_surface = pygame.Surface(img.get_size(), pygame.SRCALPHA)
+            temp_surface.blit(img, (0, 0))
+            # 关键步骤：使用 BLEND_RGB_MULT 模式给白色/灰色的原始图片填上莫兰迪颜色
+            temp_surface.fill(color, special_flags=pygame.BLEND_RGB_MULT)
+            self.screen.blit(temp_surface, img_rect)
+        else:
+            # 如果没有定义颜色，直接绘制原图
+            self.screen.blit(img, img_rect)
+
+    def update(self, dt):
+        """更新场景逻辑，这里用来获取鼠标绝对坐标"""
+        self.mouse_pos = pygame.mouse.get_pos()
 
 class SceneManager:
     """场景管理器：负责切换和更新当前场景"""

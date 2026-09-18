@@ -83,6 +83,3 @@ class FloatingArrows:
                 
                 # 5. 绘制到屏幕上
                 surface.blit(rotated_image, rect)
-            else:
-                # 如果图片没找到，回退到绘制三角形的旧逻辑
-                self._draw_triangle(surface, arrow['pos'], arrow['size'], arrow['color'])

@@ -351,7 +351,33 @@ class GameScene(BaseScene):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mx, my = event.pos
 
-            # 1. === 底部按钮处理（始终有效）===
+            # 1. === 弹窗按钮优先处理 ===
+            if self.game_state in ('won', 'lost', 'all_completed'):
+                if self.popup_left_btn.collidepoint(event.pos):
+                    if self.game_state == 'won':
+                        self.game.scene_manager.reset_to_start()
+                    elif self.game_state == 'all_completed':
+                        self.game.scene_manager.switch_scene('level_select')
+                    else:
+                        self.game.scene_manager.reset_to_start()
+                    return
+
+                if self.popup_right_btn.collidepoint(event.pos):
+                    if self.game_state == 'won':
+                        self.level_index += 1
+                        self.load_level_data()
+                        self.game_state = 'playing'
+                    elif self.game_state == 'lost':
+                        self.load_level_data()
+                        self.game_state = 'playing'
+                    else:
+                        self.game.scene_manager.reset_to_start()
+                    return
+
+                # 弹窗状态下，非弹窗按钮区域点击全部忽略
+                return
+
+            # 2. === 底部按钮处理（仅在 playing 状态下有效）===
             if self.return_btn.collidepoint(event.pos):
                 self.game.scene_manager.switch_scene('level_select')
                 return
@@ -365,53 +391,27 @@ class GameScene(BaseScene):
                 self.game.scene_manager.switch_scene('level_select')
                 return
 
-            # 2. === 弹窗按钮处理（仅在 won/lost/all_completed 状态下有效）===
-            if self.game_state in ('won', 'lost', 'all_completed'):
-                # 点击左侧按钮
-                if self.popup_left_btn.collidepoint(event.pos):
-                    if self.game_state == 'won':
-                        self.game.scene_manager.reset_to_start()
-                    elif self.game_state == 'all_completed':
-                        self.game.scene_manager.switch_scene('level_select')
-                    else:
-                        self.game.scene_manager.reset_to_start()
-                    return
+            # 3. 游戏未结束时，处理棋盘点击（原逻辑不变）
+            if self.moving_arrow is not None:
+                return
 
-                # 点击右侧按钮
-                if self.popup_right_btn.collidepoint(event.pos):
-                    if self.game_state == 'won':
-                        self.level_index += 1
-                        self.load_level_data()
-                        self.game_state = 'playing'
-                    elif self.game_state == 'lost':
-                        self.load_level_data()
-                        self.game_state = 'playing'
-                    else:
-                        self.game.scene_manager.reset_to_start()
-                    return
+            for r in range(self.rows):
+                for c in range(self.cols):
+                    cell_x = self.offset_x + c * (self.cell_size + CELL_GAP)
+                    cell_y = self.offset_y + r * (self.cell_size + CELL_GAP)
+                    cell_rect = pygame.Rect(cell_x, cell_y, self.cell_size, self.cell_size)
 
-            # 3. 游戏未结束时，处理棋盘点击
-            if self.game_state == 'playing':
-                if self.moving_arrow is not None:
-                    return
+                    if cell_rect.collidepoint(mx, my):
+                        if self.grid_map[r][c] != 0:
+                            start_px = cell_x + self.cell_size // 2
+                            start_py = cell_y + self.cell_size // 2
 
-                for r in range(self.rows):
-                    for c in range(self.cols):
-                        cell_x = self.offset_x + c * (self.cell_size + CELL_GAP)
-                        cell_y = self.offset_y + r * (self.cell_size + CELL_GAP)
-                        cell_rect = pygame.Rect(cell_x, cell_y, self.cell_size, self.cell_size)
-
-                        if cell_rect.collidepoint(mx, my):
-                            if self.grid_map[r][c] != 0:
-                                start_px = cell_x + self.cell_size // 2
-                                start_py = cell_y + self.cell_size // 2
-
-                                self.moving_arrow = {
-                                    'start_pos': (r, c),
-                                    'current_pos': (start_px, start_py),
-                                    'direction': self.grid_map[r][c]
-                                }
-                            return
+                            self.moving_arrow = {
+                                'start_pos': (r, c),
+                                'current_pos': (start_px, start_py),
+                                'direction': self.grid_map[r][c]
+                            }
+                        return
 
     def get_arrow_status(self, row, col):
         """
@@ -890,10 +890,27 @@ class GameScene(BaseScene):
         self.restart_btn.topleft = (start_x + btn_w + gap, btn_y)
         self.select_btn.topleft = (start_x + (btn_w + gap) * 2, btn_y)
 
-        # 3. 获取鼠标位置用于悬停检测
+        # 3. 弹窗状态下，所有按钮显示为禁用态
+        is_disabled = self.game_state != 'playing'
+
+        if is_disabled:
+            # 禁用态：统一灰色，无悬停、无边框
+            disabled_color = HEART_EMPTY_COLOR
+            disabled_text_color = TEXT_DARK_BG
+
+            for btn, text in [(self.return_btn, "Return"),
+                            (self.restart_btn, "Restart"),
+                            (self.select_btn, "Select")]:
+                pygame.draw.rect(self.game.screen, disabled_color, btn, border_radius=8)
+                btn_text = self.btn_font.render(text, True, disabled_text_color)
+                btn_text_rect = btn_text.get_rect(center=btn.center)
+                self.game.screen.blit(btn_text, btn_text_rect)
+            return  # 禁用态直接返回，不执行后续正常态绘制
+
+        # 4. 获取鼠标位置用于悬停检测
         mouse_pos = pygame.mouse.get_pos()
 
-        # 4. 绘制 Return 按钮
+        # 5. 绘制 Return 按钮
         return_color = BTN_BACK
         if self.return_btn.collidepoint(mouse_pos):
             return_color = return_color.lerp(pygame.Color('white'), 0.2)
@@ -903,7 +920,7 @@ class GameScene(BaseScene):
         return_text_rect = return_text.get_rect(center=self.return_btn.center)
         self.game.screen.blit(return_text, return_text_rect)
 
-        # 5. 绘制 Restart 按钮
+        # 6. 绘制 Restart 按钮
         restart_color = BTN_RESTART
         if self.restart_btn.collidepoint(mouse_pos):
             restart_color = restart_color.lerp(pygame.Color('white'), 0.2)
@@ -913,7 +930,7 @@ class GameScene(BaseScene):
         restart_text_rect = restart_text.get_rect(center=self.restart_btn.center)
         self.game.screen.blit(restart_text, restart_text_rect)
 
-        # 6. 绘制 Select 按钮
+        # 7. 绘制 Select 按钮
         select_color = BTN_SELECT_LEVEL
         if self.select_btn.collidepoint(mouse_pos):
             select_color = select_color.lerp(pygame.Color('white'), 0.2)

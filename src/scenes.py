@@ -400,15 +400,19 @@ class GameScene(BaseScene):
         arrow_bottom = curr_y + half_h
         
         if direction == DIR_UP and arrow_bottom < 0:
+            self.placed_arrows.append((start_row, start_col, direction))  # 改为增加已放置计数
             self.check_arrow_path('clear', start_row, start_col)
             self.moving_arrow = None
         elif direction == DIR_DOWN and arrow_top > SCREEN_HEIGHT:
+            self.placed_arrows.append((start_row, start_col, direction))
             self.check_arrow_path('clear', start_row, start_col)
             self.moving_arrow = None
         elif direction == DIR_LEFT and arrow_right < 0:
+            self.placed_arrows.append((start_row, start_col, direction))
             self.check_arrow_path('clear', start_row, start_col)
             self.moving_arrow = None
         elif direction == DIR_RIGHT and arrow_left > SCREEN_WIDTH:
+            self.placed_arrows.append((start_row, start_col, direction))
             self.check_arrow_path('clear', start_row, start_col)
             self.moving_arrow = None
 
@@ -429,7 +433,7 @@ class GameScene(BaseScene):
             self._draw_arrow(temp_rect, direction, pos=pos)
 
         self.draw_top_bar()
-        
+
         self.draw_restart_btn()
 
         # === 弹窗绘制（仅在 won 或 lost 状态下显示）===

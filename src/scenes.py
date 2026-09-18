@@ -56,6 +56,8 @@ class StartScene(BaseScene):
                 game_scene.game_state = 'playing'
                 self.scene_manager.switch_scene('game')
             elif self.select_level_btn.collidepoint(event.pos):
+                level_select_scene = self.game.scene_manager.scenes['level_select']
+                level_select_scene.prev_scene = 'start'
                 self.scene_manager.switch_scene('level_select')
 
     def draw(self):
@@ -97,6 +99,8 @@ class LevelSelectScene(BaseScene):
     def __init__(self, game, scene_manager, font_bold, font_regular):
         super().__init__(game)
         self.scene_manager = scene_manager
+        self.prev_scene = 'start'
+
         self.font_bold = font_bold
         self.font_regular = font_regular
         
@@ -146,13 +150,12 @@ class LevelSelectScene(BaseScene):
             
             # 检查是否点击了返回按钮
             if self.back_btn.collidepoint(mouse_pos):
-                self.scene_manager.switch_scene('start')
+                self.scene_manager.switch_scene(self.prev_scene)  # 返回上一个页面
                 return
             
             # 检查是否点击了某个关卡按钮
             for btn_rect, level_index in self.level_buttons:
                 if btn_rect.collidepoint(mouse_pos):
-                    # 跳转到游戏场景，并设置关卡索引
                     game_scene = self.scene_manager.scenes['game']
                     game_scene.level_index = level_index
                     game_scene.load_level_data()
@@ -194,7 +197,7 @@ class LevelSelectScene(BaseScene):
         pygame.draw.rect(self.screen, color, self.back_btn, border_radius=8)
         pygame.draw.rect(self.screen, TEXT_LIGHT_BG, self.back_btn, width=2, border_radius=8)
 
-        back_text = self.btn_font.render("Return", True, TEXT_LIGHT_BG)
+        back_text = self.btn_font.render("Back", True, TEXT_LIGHT_BG)
         back_text_rect = back_text.get_rect(center=self.back_btn.center)
         self.screen.blit(back_text, back_text_rect)
 
@@ -379,7 +382,7 @@ class GameScene(BaseScene):
 
             # 2. === 底部按钮处理（仅在 playing 状态下有效）===
             if self.return_btn.collidepoint(event.pos):
-                self.game.scene_manager.switch_scene('level_select')
+                self.game.scene_manager.switch_scene('start')
                 return
 
             if self.restart_btn.collidepoint(event.pos):
@@ -388,6 +391,8 @@ class GameScene(BaseScene):
                 return
 
             if self.select_btn.collidepoint(event.pos):
+                level_select_scene = self.game.scene_manager.scenes['level_select']
+                level_select_scene.prev_scene = 'game'
                 self.game.scene_manager.switch_scene('level_select')
                 return
 

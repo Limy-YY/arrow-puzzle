@@ -21,7 +21,6 @@ ARROW_START = pygame.Color('#B5A89C')
 ARROW_TARGET = pygame.Color('#E07A5F')
 
 # 按钮颜色
-BTN_START = pygame.Color('#9CAF88')
 BTN_NEXT = pygame.Color('#8BB4D4') 
 BTN_RETRY = pygame.Color('#E8B4B8')   
 BTN_RESTART = pygame.Color('#B5A89C') 
@@ -86,3 +85,20 @@ BOTTOM_BORDER_COLOR = pygame.Color('#D8D0C5')
 POPUP_TITLE_WON = pygame.Color("#517d74")      # 通关 - 灰豆绿
 POPUP_TITLE_LOST = pygame.Color('#D4A5A5')     # 失败 - 灰粉
 POPUP_TITLE_ALL_COMPLETED = pygame.Color('#e0be9a')  # 全通关 - 灰棕
+
+# --- 关卡选择界面配置 ---
+LEVEL_SELECT_TITLE_FONT_SIZE = 40
+LEVEL_BTN_FONT_SIZE = 28
+LEVEL_BTN_WIDTH = 100
+LEVEL_BTN_HEIGHT = 80
+LEVEL_BTN_GAP = 15
+LEVEL_BTN_COLS = 3
+BTN_LEVEL = pygame.Color('#B8C4B0')       # 莫兰迪绿 - 关卡按钮底色
+BTN_LEVEL_HOVER = pygame.Color('#A3B29A') # 深一点的莫兰迪绿 - 悬停效果
+BTN_BACK_HOVER = pygame.Color('#668855') 
+
+# 开始界面按钮颜色
+BTN_START = pygame.Color('#A9C2A8')
+BTN_START_HOVER = pygame.Color('#86aa9a')    # 比 BTN_START 稍浅，用于悬停效果
+BTN_SELECT_LEVEL = pygame.Color('#A9C2A8')   # 暖灰棕 - Select Level 按钮底色
+BTN_SELECT_LEVEL_HOVER = pygame.Color('#86aa9a')  # 稍浅的暖灰棕 - 悬停效果

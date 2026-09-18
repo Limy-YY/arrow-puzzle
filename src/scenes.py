@@ -120,6 +120,14 @@ class GameScene(BaseScene):
         self.icon_heart_empty = pygame.image.load(os.path.join(BASE_DIR, 'assets', 'icons', 'heart-empty.png')).convert_alpha()
         self.icon_heart_empty = pygame.transform.scale(self.icon_heart_empty, (ICON_SIZE, ICON_SIZE))
 
+        # === 新增：移动动画配置 ===
+        self.move_speed = 600  # 像素/秒，可以调整这个值来改变箭头飞行速度
+
+        # === 新增：移动状态追踪 ===
+        # 用于存储正在移动的箭头信息，结构为：
+        # {'start_pos': (row, col), 'current_pos': (x, y), 'direction': dir}
+        self.moving_arrow = None
+
         # 初始化关卡数据
         self.load_level_data()
 
@@ -178,13 +186,27 @@ class GameScene(BaseScene):
 
             # 2. 游戏未结束时，处理棋盘点击
             if self.game_state == 'playing':
+                # 如果已经有箭头在移动，则忽略新的点击
+                if self.moving_arrow is not None:
+                    return
+
                 rel_x = mx - self.offset_x
                 rel_y = my - self.offset_y
                 if 0 <= rel_x < self.cols * (self.cell_size + CELL_GAP) and \
                    0 <= rel_y < self.rows * (self.cell_size + CELL_GAP):
+                    
                     grid_col = rel_x // (self.cell_size + CELL_GAP)
                     grid_row = rel_y // (self.cell_size + CELL_GAP)
-                    self.check_arrow_path(grid_row, grid_col)
+                    
+                    # --- 核心改动：调用“侦探”函数 ---
+                    status = self.get_arrow_status(grid_row, grid_col)
+                    
+                    # 如果是空格子，则不执行任何操作
+                    if status == 'invalid':
+                        return
+
+                    # 根据“侦探”的汇报，立即执行奖惩逻辑
+                    self.check_arrow_path(status, grid_row, grid_col)
                 return
 
             # 3. === 弹窗按钮处理（仅在 won/lost 状态下有效）===
@@ -206,10 +228,14 @@ class GameScene(BaseScene):
                         self.game.scene_manager.reset_to_start()
                     return
 
-    def check_arrow_path(self, row, col):
-        """检查点击箭头的路径是否畅通"""
+    def get_arrow_status(self, row, col):
+        """
+        【侦探】检查指定位置箭头的路径状态。
+        只负责检测，不修改任何游戏状态。
+        返回: 'clear' (路径畅通), 'blocked' (路径被阻挡), 'invalid' (空格子)
+        """
         if self.grid_map[row][col] == 0:
-            return
+            return 'invalid'
             
         direction = self.grid_map[row][col]
         dr = {DIR_UP: -1, DIR_DOWN: 1, DIR_LEFT: 0, DIR_RIGHT: 0}
@@ -218,31 +244,46 @@ class GameScene(BaseScene):
         current_r = row + dr[direction]
         current_c = col + dc[direction]
         
+        # 沿着方向检查路径
         while 0 <= current_r < self.rows and 0 <= current_c < self.cols:
             if self.grid_map[current_r][current_c] != 0:
-                # --- 路径被阻挡：触发晃动 + 计数 ---
-                self.shaking_arrow = (row, col)
-                self.shake_timer = 0.3
-                self.mistake_count += 1
-                
-                # 判定失败：不再自动重置，而是切换到 'lost' 状态
-                if self.mistake_count >= self.max_mistakes:
-                    print("❌ 游戏失败！等待玩家操作。")
-                    self.game_state = 'lost'
-                return # 无论是否失败，都直接返回，不再继续执行
-            
+                # 发现前方有箭头阻挡
+                return 'blocked'
             current_r += dr[direction]
             current_c += dc[direction]
             
-        # --- 路径畅通：消除箭头 ---
-        self.grid_map[row][col] = 0
-        print(f"✅ 消除！({row},{col}) 方向{direction} 飞出棋盘。")
-        
-        # 判定胜利：不再自动跳关，而是切换到 'won' 状态
-        arrows_remaining = any(cell != 0 for row_data in self.grid_map for cell in row_data)
-        if not arrows_remaining:
-            print("🎉 恭喜通关本关！等待玩家操作。")
-            self.game_state = 'won'
+        # 成功飞出棋盘边界
+        return 'clear'
+
+    def check_arrow_path(self, status, row, col):
+        """
+        【执行官】根据路径状态执行相应的逻辑（消除、晃动、判定胜负）。
+        参数:
+            status: 'clear' 或 'blocked'
+            row, col: 箭头的起始坐标
+        """
+        if status == 'clear':
+            # --- 路径畅通：消除箭头 ---
+            self.grid_map[row][col] = 0
+            print(f"✅ 消除！({row},{col}) 飞出棋盘。")
+            
+            # 判定胜利
+            arrows_remaining = any(cell != 0 for row_data in self.grid_map for cell in row_data)
+            if not arrows_remaining:
+                print("🎉 恭喜通关本关！等待玩家操作。")
+                self.game_state = 'won'
+                
+        elif status == 'blocked':
+            # --- 路径被阻挡：触发晃动 + 计数 ---
+            self.shaking_arrow = (row, col)
+            self.shake_timer = 0.3
+            self.mistake_count += 1
+            print(f"❌ 碰撞！({row},{col}) 路径被阻挡。")
+            
+            # 判定失败
+            if self.mistake_count >= self.max_mistakes:
+                print("❌ 游戏失败！等待玩家操作。")
+                self.game_state = 'lost'
 
     def update(self, dt):
         """每帧更新逻辑"""

@@ -34,9 +34,29 @@ class StartScene(BaseScene):
 
         self.bg_arrows = FloatingArrows(count=30) 
 
+        # 按钮区域
+        self.start_btn = pygame.Rect(
+            SCREEN_WIDTH // 2 - 100,
+            SCREEN_HEIGHT // 2 + 20,
+            200, 50
+        )
+        self.select_level_btn = pygame.Rect(
+            SCREEN_WIDTH // 2 - 100,
+            SCREEN_HEIGHT // 2 + 85,
+            200, 50
+        )
+
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            self.scene_manager.switch_scene('game')
+            if self.start_btn.collidepoint(event.pos):
+                # 开始第一关
+                game_scene = self.scene_manager.scenes['game']
+                game_scene.level_index = 0
+                game_scene.load_level_data()
+                game_scene.game_state = 'playing'
+                self.scene_manager.switch_scene('game')
+            elif self.select_level_btn.collidepoint(event.pos):
+                self.scene_manager.switch_scene('level_select')
 
     def draw(self):
         # 1. 先填充新的浅色背景
@@ -44,13 +64,139 @@ class StartScene(BaseScene):
         # 2. 更新并绘制飘动的彩色箭头
         self.bg_arrows.update()
         self.bg_arrows.draw(self.screen)
-        # 3. 最后绘制标题和提示文字，确保文字在最上层
+        # 3. 最后绘制标题，确保文字在最上层
         title = self.font_bold.render('Arrow Puzzle', True, TEXT_LIGHT_BG)
         title_rect = title.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 40))
         self.screen.blit(title, title_rect)
-        hint = self.small_font.render('Click anywhere to start', True, TEXT_LIGHT_BG)
-        hint_rect = hint.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 40))
-        self.screen.blit(hint, hint_rect)
+
+        # 绘制按钮
+        mouse_pos = pygame.mouse.get_pos()
+
+        # --- Start 按钮 ---
+        start_color = BTN_START
+        if self.start_btn.collidepoint(mouse_pos):
+            start_color = BTN_START_HOVER
+        pygame.draw.rect(self.screen, start_color, self.start_btn, border_radius=8)
+        pygame.draw.rect(self.screen, TEXT_LIGHT_BG, self.start_btn, width=2, border_radius=8)
+        start_text = self.small_font.render("Start", True, TEXT_DARK_BG)
+        start_text_rect = start_text.get_rect(center=self.start_btn.center)
+        self.screen.blit(start_text, start_text_rect)
+
+        # --- Select Level 按钮 ---
+        select_color = BTN_SELECT_LEVEL
+        if self.select_level_btn.collidepoint(mouse_pos):
+            select_color = BTN_SELECT_LEVEL_HOVER
+        pygame.draw.rect(self.screen, select_color, self.select_level_btn, border_radius=8)
+        pygame.draw.rect(self.screen, TEXT_LIGHT_BG, self.select_level_btn, width=2, border_radius=8)
+        select_text = self.small_font.render("Select Level", True, TEXT_DARK_BG)
+        select_text_rect = select_text.get_rect(center=self.select_level_btn.center)
+        self.screen.blit(select_text, select_text_rect)
+
+class LevelSelectScene(BaseScene):
+    """关卡选择界面"""
+    def __init__(self, game, scene_manager, font_bold, font_regular):
+        super().__init__(game)
+        self.scene_manager = scene_manager
+        self.font_bold = font_bold
+        self.font_regular = font_regular
+        
+        # 使用 settings 中的配置
+        self.num_cols = LEVEL_BTN_COLS
+        self.btn_width = LEVEL_BTN_WIDTH
+        self.btn_height = LEVEL_BTN_HEIGHT
+        self.btn_gap = LEVEL_BTN_GAP
+        
+        # 创建专用字体
+        font_path = FONT_PATH if (FONT_PATH and os.path.exists(FONT_PATH)) else None
+        self.title_font = pygame.font.Font(font_path, LEVEL_SELECT_TITLE_FONT_SIZE)
+        self.btn_font = pygame.font.Font(font_path, LEVEL_BTN_FONT_SIZE)
+        
+        # 计算按钮布局
+        self.level_buttons = [] # 存储 (rect, level_index) 元组
+        self._calculate_button_layout()
+        
+        # 创建返回按钮
+        self.back_btn = pygame.Rect(
+            SCREEN_WIDTH // 2 - 100,
+            SCREEN_HEIGHT - 80,
+            200, 50
+        )
+
+    def _calculate_button_layout(self):
+        """根据关卡数量动态计算按钮网格布局"""
+        self.level_buttons = []
+        total_levels = len(self.game.levels)
+        num_rows = math.ceil(total_levels / self.num_cols)
+        
+        # 计算网格起始位置，使其居中
+        grid_width = self.num_cols * self.btn_width + (self.num_cols - 1) * self.btn_gap
+        start_x = (SCREEN_WIDTH - grid_width) // 2
+        start_y = 120 # 标题下方留白
+        
+        for i in range(total_levels):
+            row, col = divmod(i, self.num_cols)
+            x = start_x + col * (self.btn_width + self.btn_gap)
+            y = start_y + row * (self.btn_height + self.btn_gap)
+            btn_rect = pygame.Rect(x, y, self.btn_width, self.btn_height)
+            self.level_buttons.append((btn_rect, i))
+
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            mouse_pos = event.pos
+            
+            # 检查是否点击了返回按钮
+            if self.back_btn.collidepoint(mouse_pos):
+                self.scene_manager.switch_scene('start')
+                return
+            
+            # 检查是否点击了某个关卡按钮
+            for btn_rect, level_index in self.level_buttons:
+                if btn_rect.collidepoint(mouse_pos):
+                    # 跳转到游戏场景，并设置关卡索引
+                    game_scene = self.scene_manager.scenes['game']
+                    game_scene.level_index = level_index
+                    game_scene.load_level_data()
+                    game_scene.game_state = 'playing'
+                    self.scene_manager.switch_scene('game')
+                    return
+
+    def draw(self):
+        # 1. 绘制背景
+        self.screen.fill(BG_MENU)
+        
+        # 2. 绘制标题
+        title_text = self.title_font.render("Select Level", True, TEXT_LIGHT_BG)
+        title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, 60))
+        self.screen.blit(title_text, title_rect)
+        
+        # 3. 绘制关卡按钮
+        mouse_pos = pygame.mouse.get_pos()
+        for btn_rect, level_index in self.level_buttons:
+            # 悬停效果：使用预设的悬停色
+            color = BTN_LEVEL
+            if btn_rect.collidepoint(mouse_pos):
+                color = BTN_LEVEL_HOVER
+            
+            pygame.draw.rect(self.screen, color, btn_rect, border_radius=8)
+            pygame.draw.rect(self.screen, TEXT_LIGHT_BG, btn_rect, width=2, border_radius=8)
+            
+            # 绘制关卡数字
+            level_num = level_index + 1
+            text_surface = self.btn_font.render(str(level_num), True, TEXT_DARK_BG)
+            text_rect = text_surface.get_rect(center=btn_rect.center)
+            self.screen.blit(text_surface, text_rect)
+            
+        # 4. 绘制返回按钮
+        color = BTN_BACK
+        if self.back_btn.collidepoint(mouse_pos):
+            color = BTN_BACK_HOVER # 使用预设的悬停色
+            
+        pygame.draw.rect(self.screen, color, self.back_btn, border_radius=8)
+        pygame.draw.rect(self.screen, TEXT_LIGHT_BG, self.back_btn, width=2, border_radius=8)
+
+        back_text = self.btn_font.render("Back", True, TEXT_DARK_BG)
+        back_text_rect = back_text.get_rect(center=self.back_btn.center)
+        self.screen.blit(back_text, back_text_rect)
 
 class GameScene(BaseScene):
     """游戏主界面"""
@@ -716,6 +862,7 @@ class SceneManager:
         
         self.scenes = {
             'start': StartScene(self.game, self, self.game_font_bold, self.game_font_regular),
+            'level_select': LevelSelectScene(self.game, self, self.game_font_bold, self.game_font_regular), 
             'game': GameScene(game, self.game_font_bold, self.game_font_regular),
         }
         self.current_scene_name = 'start'

@@ -13,7 +13,7 @@
             ]
         },
         {
-            "level": 2,
+            "level": 3,
             "grid_size": [6, 6],
             "max_failures": 3,
             "arrows_left": 36,

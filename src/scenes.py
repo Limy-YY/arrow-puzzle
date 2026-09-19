@@ -210,6 +210,7 @@ class GameScene(BaseScene):
         super().__init__(game)
         self.level_index = 0
         self.game = game
+        self.pending_click = None
         
         # 1. 初始化所有需要的字体
         self.font_bold = font_bold
@@ -422,10 +423,7 @@ class GameScene(BaseScene):
                 self.game.scene_manager.switch_scene('level_select')
                 return
 
-            # 3. 游戏未结束时，处理棋盘点击（原逻辑不变）
-            if self.moving_arrow is not None:
-                return
-
+            # 3. 游戏未结束时，处理棋盘点击
             for r in range(self.rows):
                 for c in range(self.cols):
                     cell_x = self.offset_x + c * (self.cell_size + CELL_GAP)
@@ -434,15 +432,19 @@ class GameScene(BaseScene):
 
                     if cell_rect.collidepoint(mx, my):
                         if self.grid_map[r][c] != 0:
-                            start_px = cell_x + self.cell_size // 2
-                            start_py = cell_y + self.cell_size // 2
-
-                            self.moving_arrow = {
-                                'start_pos': (r, c),
-                                'current_pos': (start_px, start_py),
-                                'direction': self.grid_map[r][c]
-                            }
-                        return
+                            if self.moving_arrow is None:
+                                # 当前无动画，直接放置
+                                start_px = cell_x + self.cell_size // 2
+                                start_py = cell_y + self.cell_size // 2
+                                self.moving_arrow = {
+                                    'start_pos': (r, c),
+                                    'current_pos': (start_px, start_py),
+                                    'direction': self.grid_map[r][c]
+                                }
+                            else:
+                                # 有动画正在播放，排队等待（只保留最后一次点击）
+                                self.pending_click = (r, c)
+                            return
 
     def get_arrow_status(self, row, col):
         """
@@ -630,7 +632,7 @@ class GameScene(BaseScene):
             
             if overlap_point is not None:
                 self.check_arrow_path('blocked', start_row, start_col)
-                self.moving_arrow = None
+                self._try_next_pending_arrow()
                 return
 
         # 5. 边界检测：判断是否完全飞出屏幕
@@ -644,19 +646,19 @@ class GameScene(BaseScene):
         if direction == DIR_UP and arrow_bottom < 0:
             self.placed_arrows.append((start_row, start_col, direction))  # 改为增加已放置计数
             self.check_arrow_path('clear', start_row, start_col)
-            self.moving_arrow = None
+            self._try_next_pending_arrow()
         elif direction == DIR_DOWN and arrow_top > SCREEN_HEIGHT:
             self.placed_arrows.append((start_row, start_col, direction))
             self.check_arrow_path('clear', start_row, start_col)
-            self.moving_arrow = None
+            self._try_next_pending_arrow()
         elif direction == DIR_LEFT and arrow_right < 0:
             self.placed_arrows.append((start_row, start_col, direction))
             self.check_arrow_path('clear', start_row, start_col)
-            self.moving_arrow = None
+            self._try_next_pending_arrow()
         elif direction == DIR_RIGHT and arrow_left > SCREEN_WIDTH:
             self.placed_arrows.append((start_row, start_col, direction))
             self.check_arrow_path('clear', start_row, start_col)
-            self.moving_arrow = None
+            self._try_next_pending_arrow()
 
     def draw(self):
         """清屏 -> 绘制背景 -> 绘制棋盘 -> 绘制UI -> 绘制弹窗"""
@@ -1088,6 +1090,24 @@ class GameScene(BaseScene):
         else:  # lost
             draw_interactive_button(self.popup_left_btn, "Return", BTN_BACK)
             draw_interactive_button(self.popup_right_btn, "Retry", BTN_RETRY)
+
+    def _try_next_pending_arrow(self):
+        """尝试触发排队的箭头，或清除 moving_arrow"""
+        if self.pending_click:
+            r, c = self.pending_click
+            self.pending_click = None
+            if self.grid_map[r][c] != 0:
+                cell_x = self.offset_x + c * (self.cell_size + CELL_GAP)
+                cell_y = self.offset_y + r * (self.cell_size + CELL_GAP)
+                start_px = cell_x + self.cell_size // 2
+                start_py = cell_y + self.cell_size // 2
+                self.moving_arrow = {
+                    'start_pos': (r, c),
+                    'current_pos': (start_px, start_py),
+                    'direction': self.grid_map[r][c]
+                }
+                return
+        self.moving_arrow = None
 
 class SceneManager:
     """场景管理器：负责切换和更新当前场景"""

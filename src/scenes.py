@@ -691,7 +691,9 @@ class GameScene(BaseScene):
 
         # 6. 仅在特定状态下绘制新弹窗
         if self.game_state in ('won', 'lost', 'all_completed'):
-            self._draw_popup_overlay()
+            # 通关和全通关传 True，失败传 False
+            is_success = self.game_state in ('won', 'all_completed')
+            self._draw_popup_overlay(is_success=is_success)
 
     def _draw_board(self):
         """绘制棋盘网格及箭头"""
@@ -919,24 +921,37 @@ class GameScene(BaseScene):
         select_text_rect = select_text.get_rect(center=self.select_btn.center)
         self.game.screen.blit(select_text, select_text_rect)
 
-    def _draw_popup_overlay(self):
+    def _draw_popup_overlay(self, is_success=True):
         """
         极简氛围版：半透明遮罩 + 中心放射柔光
+        参数 is_success: True为通关(暖色光), False为失败(灰色光)
         """
-        mouse_pos = pygame.mouse.get_pos()
-
-        # 0. 绘制半透明灰蓝色遮罩（压暗底层游戏背景，突出弹窗）
+        # 0. 绘制半透明遮罩（根据状态切换颜色）
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-        overlay.fill((111, 119, 136))
-        overlay.set_alpha(160) 
+        if is_success:
+            # 通关：保留之前的灰蓝色
+            overlay.fill((111, 119, 136)) 
+            overlay.set_alpha(160)
+        else:
+            # 失败：压暗的冷灰色，营造遗憾感
+            overlay.fill((100, 100, 100)) 
+            overlay.set_alpha(180)
+        
         self.screen.blit(overlay, (0, 0))
 
         # 1. 创建独立的光效图层
         fx_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
 
-        # 2. 绘制中心放射光束（完美的线性衰减版）
+        # 2. 绘制中心放射光束（根据状态切换颜色和长度）
         center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
-        max_beam_length = 200  # 光束最大长度
+        
+        if is_success:
+            max_beam_length = 200
+            beam_color = BEAM_CENTER_COLOR  # 使用原定的通关暖色
+        else:
+            max_beam_length = 200           # 失败时缩短光束长度
+            beam_color = (210, 210, 210)    # 设置为清冷的灰色
+        
         num_beams = 16         # 光束数量
         
         # 使用三角函数计算每一道光束的形状
@@ -957,7 +972,7 @@ class GameScene(BaseScene):
 
                 # 从中心向外，光束逐渐变宽
                 width_start = 2 + 25 * ratio_start 
-                width_end = 2 + 25 * ratio_end
+                width_end = 2 + 25 * ratio_start
                 
                 cos_a = math.cos(angle_rad)
                 sin_a = math.sin(angle_rad)
@@ -973,8 +988,8 @@ class GameScene(BaseScene):
                 p3 = (center[0] + dist_end * cos_a + px_end, center[1] + dist_end * sin_a + py_end)
                 p4 = (center[0] + dist_end * cos_a - px_end, center[1] + dist_end * sin_a - py_end)
 
-                # 将光束绘制到独立图层上
-                pygame.draw.polygon(fx_surface, (*BEAM_CENTER_COLOR, current_alpha), [p1, p3, p4, p2])
+                # 使用对应的颜色绘制光束
+                pygame.draw.polygon(fx_surface, (*beam_color, current_alpha), [p1, p3, p4, p2])
 
         # 3. 将绘制好的光效图层一次性贴到主屏幕
         self.screen.blit(fx_surface, (0, 0))

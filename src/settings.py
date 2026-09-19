@@ -104,3 +104,20 @@ BTN_START = pygame.Color('#A9C2A8')
 BTN_START_HOVER = pygame.Color('#86aa9a')    
 BTN_SELECT_LEVEL = pygame.Color('#A9C2A8')  
 BTN_SELECT_LEVEL_HOVER = pygame.Color('#86aa9a') 
+
+# =================
+# 庆典粒子配色 (庆祝胜利时的彩带和星星颜色)
+# =================
+# 彩带颜色
+CONFETTI_COLORS = [
+    (212, 176, 181),  # ARROW_UP 浅粉
+    (152, 169, 189),  # ARROW_DOWN 淡蓝
+    (156, 175, 136),  # ARROW_LEFT 淡绿
+    (232, 217, 185),  # ARROW_RIGHT 浅黄
+]
+    
+# 星星颜色
+STAR_COLOR = (255, 235, 150)  # 亮黄色星星
+    
+# 光束中心色（高亮暖黄）
+BEAM_CENTER_COLOR = (255, 250, 200)

@@ -702,13 +702,11 @@ class GameScene(BaseScene):
 
             # 3. 标题（大标题 + 副标题）
             if self.game_state == 'all_completed':
-                title_text = "Congratulations!"
-                # 显示总用时
-                subtitle_text = f"All levels cleared in {self.level_time_used}s!"
+                title_text = "Level Complete!!"
+                subtitle_text = f"Time: {self.level_time_used}s!"
                 title_color = POPUP_TITLE_ALL_COMPLETED
             elif self.game_state == 'won':
                 title_text = "Level Complete!"
-                # 显示本关用时
                 subtitle_text = f"Time: {self.level_time_used}s"
                 title_color = POPUP_TITLE_WON
             else:  # lost
@@ -722,12 +720,11 @@ class GameScene(BaseScene):
             self.screen.blit(title_surface, title_rect)
 
             # 渲染副标题（小字号，间距15px）
-            subtitle_font = pygame.font.Font(FONT_PATH, 22) if FONT_PATH else pygame.font.Font(None, 22)
-            subtitle_surface = subtitle_font.render(subtitle_text, True, STATUS_TEXT_COLOR)
+            subtitle_surface = self.small_font.render(subtitle_text, True, STATUS_TEXT_COLOR)
             subtitle_rect = subtitle_surface.get_rect(center=(SCREEN_WIDTH // 2, title_rect.bottom + 15))
             self.screen.blit(subtitle_surface, subtitle_rect)
 
-            # === 关键修改：同步弹窗按钮位置，确保点击区域与视觉位置一致 ===
+            # === 同步弹窗按钮位置，确保点击区域与视觉位置一致 ===
             btn_width = 130
             btn_height = 45
             center_x = SCREEN_WIDTH // 2
@@ -750,7 +747,7 @@ class GameScene(BaseScene):
                     select_color = select_color.lerp(pygame.Color('white'), 0.2)
                 pygame.draw.rect(self.screen, select_color, self.popup_left_btn, border_radius=8)
                 pygame.draw.rect(self.screen, pygame.Color('#C0C0C0'), self.popup_left_btn, 2, border_radius=8)
-                select_text = self.btn_font.render("Select Level", True, TEXT_DARK_BG)
+                select_text = self.small_font.render("Select", True, TEXT_DARK_BG)
                 select_text_rect = select_text.get_rect(center=self.popup_left_btn.center)
                 self.screen.blit(select_text, select_text_rect)
 
@@ -760,7 +757,7 @@ class GameScene(BaseScene):
                     return_color = return_color.lerp(pygame.Color('white'), 0.2)
                 pygame.draw.rect(self.screen, return_color, self.popup_right_btn, border_radius=8)
                 pygame.draw.rect(self.screen, pygame.Color('#C0C0C0'), self.popup_right_btn, 2, border_radius=8)
-                return_text = self.btn_font.render("Return", True, TEXT_DARK_BG)
+                return_text = self.small_font.render("Return", True, TEXT_DARK_BG)
                 return_text_rect = return_text.get_rect(center=self.popup_right_btn.center)
                 self.screen.blit(return_text, return_text_rect)
 
@@ -772,7 +769,7 @@ class GameScene(BaseScene):
                     return_color = return_color.lerp(pygame.Color('white'), 0.2)
                 pygame.draw.rect(self.screen, return_color, self.popup_left_btn, border_radius=8)
                 pygame.draw.rect(self.screen, pygame.Color('#C0C0C0'), self.popup_left_btn, 2, border_radius=8)
-                return_text = self.btn_font.render("Return", True, TEXT_DARK_BG)
+                return_text = self.small_font.render("Return", True, TEXT_DARK_BG)
                 return_text_rect = return_text.get_rect(center=self.popup_left_btn.center)
                 self.screen.blit(return_text, return_text_rect)
 
@@ -782,7 +779,7 @@ class GameScene(BaseScene):
                     next_color = next_color.lerp(pygame.Color('white'), 0.2)
                 pygame.draw.rect(self.screen, next_color, self.popup_right_btn, border_radius=8)
                 pygame.draw.rect(self.screen, pygame.Color('#C0C0C0'), self.popup_right_btn, 2, border_radius=8)
-                next_text = self.btn_font.render("Next", True, TEXT_DARK_BG)
+                next_text = self.small_font.render("Next", True, TEXT_DARK_BG)
                 next_text_rect = next_text.get_rect(center=self.popup_right_btn.center)
                 self.screen.blit(next_text, next_text_rect)
 
@@ -794,7 +791,7 @@ class GameScene(BaseScene):
                     return_color = return_color.lerp(pygame.Color('white'), 0.2)
                 pygame.draw.rect(self.screen, return_color, self.popup_left_btn, border_radius=8)
                 pygame.draw.rect(self.screen, pygame.Color('#C0C0C0'), self.popup_left_btn, 2, border_radius=8)
-                return_text = self.btn_font.render("Return", True, TEXT_DARK_BG)
+                return_text = self.small_font.render("Return", True, TEXT_DARK_BG)
                 return_text_rect = return_text.get_rect(center=self.popup_left_btn.center)
                 self.screen.blit(return_text, return_text_rect)
 
@@ -804,7 +801,7 @@ class GameScene(BaseScene):
                     retry_color = retry_color.lerp(pygame.Color('white'), 0.2)
                 pygame.draw.rect(self.screen, retry_color, self.popup_right_btn, border_radius=8)
                 pygame.draw.rect(self.screen, pygame.Color('#C0C0C0'), self.popup_right_btn, 2, border_radius=8)
-                retry_text = self.btn_font.render("Retry", True, TEXT_DARK_BG)
+                retry_text = self.small_font.render("Retry", True, TEXT_DARK_BG)
                 retry_text_rect = retry_text.get_rect(center=self.popup_right_btn.center)
                 self.screen.blit(retry_text, retry_text_rect)
 

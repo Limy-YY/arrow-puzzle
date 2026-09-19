@@ -5,6 +5,7 @@ import copy
 from settings import *
 from background import FloatingArrows 
 import numpy as np
+import random
 
 class BaseScene:
     """场景基类：所有场景都要继承它"""
@@ -217,6 +218,8 @@ class GameScene(BaseScene):
         font_path = FONT_PATH if (FONT_PATH and os.path.exists(FONT_PATH)) else None
         self.popup_title_font = pygame.font.Font(font_path, 36)
         self.popup_title_font.set_bold(True)
+        self.time_bold_font = pygame.font.Font(FONT_PATH, POPUP_TIME_BOLD_FONT_SIZE)
+        self.time_bold_font.set_bold(True)  # 开启加粗
         self.ui_font = pygame.font.Font(font_path, UI_FONT_SIZE)
         self.btn_font = pygame.font.Font(font_path, BTN_FONT_SIZE)
         self.small_font = pygame.font.Font(font_path, 24) 
@@ -918,96 +921,64 @@ class GameScene(BaseScene):
 
     def _draw_popup_overlay(self):
         """
-        重构后的弹窗绘制逻辑，包含光束、标题、按钮交互。
+        极简氛围版：半透明遮罩 + 中心放射柔光
         """
         mouse_pos = pygame.mouse.get_pos()
 
-        # 1. 绘制半透明遮罩
+        # 0. 绘制半透明灰蓝色遮罩（压暗底层游戏背景，突出弹窗）
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-        overlay.set_alpha(150)
-        overlay.fill((0, 0, 0))
+        overlay.fill((111, 119, 136))
+        overlay.set_alpha(160) 
         self.screen.blit(overlay, (0, 0))
 
-        # 2. 绘制像素级无缝平滑光束（稳健防报错版）
-        beam_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-        center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
-        max_beam_length = 400
-        
-        
-        # 1. 使用 Numpy 计算完美平滑的光效强度（只算黑白明暗）
-        ys = np.arange(SCREEN_HEIGHT, dtype=np.float32)
-        xs = np.arange(SCREEN_WIDTH, dtype=np.float32)
-        # 创建坐标矩阵 (H, W)
-        xx, yy = np.meshgrid(xs - center[0], ys - center[1])
-        
-        # 计算极坐标
-        distances = np.sqrt(xx**2 + yy**2)
-        angles = np.arctan2(yy, xx)
-        
-        # 【无缝连续光束】：利用 cos 的绝对值实现完美的柔边，无硬切
-        angle_strength = np.abs(np.cos(angles * 10))
-        
-        # 【平滑径向衰减】：中心亮，边缘迅速柔和消失
-        dist_strength = np.maximum(0.0, 1.0 - distances / max_beam_length) ** 2
-        
-        # 计算最终单通道强度 (0.0 到 1.0)
-        intensity = (angle_strength * dist_strength).astype(np.float32)
+        # 1. 创建独立的光效图层
+        fx_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
 
-        # 2. 绘制经典无缝平滑光束）
-        beam_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        # 2. 绘制中心放射光束（完美的线性衰减版）
         center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
-        max_beam_length = 200  # 【核心修改】将光束最大长度限制在 150px
-        num_beams = 16      
-
+        max_beam_length = 200  # 光束最大长度
+        num_beams = 16         # 光束数量
+        
+        # 使用三角函数计算每一道光束的形状
         for i in range(num_beams):
             angle_rad = math.radians((i / num_beams) * 360)
-            segments = 40
+            segments = 40  # 将每道光束切分成40段，实现平滑渐变
             
             for j in range(segments):
-                # 计算当前微段在整个200px长度中的比例（0 到 1）
                 ratio_start = j / segments
                 ratio_end = (j + 1) / segments
-                
-                # 真实的距离
                 dist_start = max_beam_length * ratio_start
                 dist_end = max_beam_length * ratio_end
 
-                # 平滑衰减：中心(0%)最亮，到边缘(100%)完全消失
-                ratio = ratio_end
-                current_alpha = int(180 * (1 - ratio) ** 1) 
-                
-                if current_alpha <= 0:
+                # 从中心向外，透明度逐渐降低至完全透明
+                current_alpha = int(180 * (1 - ratio_end)) 
+                if current_alpha <= 0: 
                     continue
 
-                # 【宽度调整】因为总长度变短了，稍微加宽一点让比例更协调
+                # 从中心向外，光束逐渐变宽
                 width_start = 2 + 25 * ratio_start 
                 width_end = 2 + 25 * ratio_end
-
+                
                 cos_a = math.cos(angle_rad)
                 sin_a = math.sin(angle_rad)
 
-                # 计算起点两个端点 (p1, p2)
+                # 计算四边形的四个顶点
                 px_start = -width_start * sin_a
                 py_start = width_start * cos_a
-                p1 = (center[0] + dist_start * cos_a + px_start, 
-                      center[1] + dist_start * sin_a + py_start)
-                p2 = (center[0] + dist_start * cos_a - px_start, 
-                      center[1] + dist_start * sin_a - py_start)
+                p1 = (center[0] + dist_start * cos_a + px_start, center[1] + dist_start * sin_a + py_start)
+                p2 = (center[0] + dist_start * cos_a - px_start, center[1] + dist_start * sin_a - py_start)
 
-                # 计算终点两个端点 (p3, p4)
                 px_end = -width_end * sin_a
                 py_end = width_end * cos_a
-                p3 = (center[0] + dist_end * cos_a + px_end, 
-                      center[1] + dist_end * sin_a + py_end)
-                p4 = (center[0] + dist_end * cos_a - px_end, 
-                      center[1] + dist_end * sin_a - py_end)
+                p3 = (center[0] + dist_end * cos_a + px_end, center[1] + dist_end * sin_a + py_end)
+                p4 = (center[0] + dist_end * cos_a - px_end, center[1] + dist_end * sin_a - py_end)
 
-                # 绘制这一小段光束
-                segment_color = (*BEAM_CENTER_COLOR, current_alpha)
-                pygame.draw.polygon(beam_surface, segment_color, [p1, p3, p4, p2])
+                # 将光束绘制到独立图层上
+                pygame.draw.polygon(fx_surface, (*BEAM_CENTER_COLOR, current_alpha), [p1, p3, p4, p2])
 
-        # 将光束层绘制到主屏幕上
-        self.game.screen.blit(beam_surface, (0, 0))
+        # 3. 将绘制好的光效图层一次性贴到主屏幕
+        self.screen.blit(fx_surface, (0, 0))
+
         # 3. 绘制弹窗主体
         popup_rect = pygame.Rect(self.popup_x, self.popup_y, self.popup_width, self.popup_height)
 
@@ -1033,9 +1004,36 @@ class GameScene(BaseScene):
         title_rect = title_surface.get_rect(center=(SCREEN_WIDTH // 2, self.popup_y + 45))
         self.screen.blit(title_surface, title_rect)
 
-        subtitle_surface = self.small_font.render(subtitle_text, True, STATUS_TEXT_COLOR)
-        subtitle_rect = subtitle_surface.get_rect(center=(SCREEN_WIDTH // 2, title_rect.bottom + 15))
-        self.screen.blit(subtitle_surface, subtitle_rect)
+        # 失败界面：保持原样，一行小字
+        if self.game_state == 'lost':
+            subtitle_surface = self.small_font.render(subtitle_text, True, STATUS_TEXT_COLOR)
+            subtitle_rect = subtitle_surface.get_rect(center=(SCREEN_WIDTH // 2, title_rect.bottom + 15))
+            self.screen.blit(subtitle_surface, subtitle_rect)
+        else:
+            # 通关 / 全通关界面：整体居中 + 垂直重心对齐
+            time_str = f"{self.level_time_used}s"
+
+            # 1. 渲染两部分文字
+            label_surface = self.popup_title_font.render("Time:", True, title_color)
+            time_surface = self.time_bold_font.render(time_str, True, title_color)
+
+            # 2. 计算组合后的总宽度和起始 X 坐标（实现整体水平居中）
+            gap = 10  # "Time:" 和数字之间的间距
+            total_width = label_surface.get_width() + gap + time_surface.get_width()
+            start_x = (SCREEN_WIDTH - total_width) // 2
+
+            # 3. 确定垂直中心线（在大标题下方 60px 处）
+            center_y = title_rect.bottom + 30 
+
+            # 4. 绘制 "Time:"（从计算好的 start_x 开始，垂直中心对齐）
+            label_rect = label_surface.get_rect(topleft=(start_x, 0))
+            label_rect.centery = center_y  # 强制垂直居中
+            self.screen.blit(label_surface, label_rect)
+
+            # 5. 绘制数字（紧跟在 Time: 右侧，垂直中心对齐）
+            time_rect = time_surface.get_rect(topleft=(label_rect.right + gap, 0))
+            time_rect.centery = center_y  # 确保与 Time: 共用同一个垂直中心线
+            self.screen.blit(time_surface, time_rect)
 
         # 5. 同步按钮位置（确保点击区域与视觉一致）
         btn_width = 130
@@ -1054,6 +1052,7 @@ class GameScene(BaseScene):
         # 辅助函数：绘制带悬停交互的圆角按钮
         def draw_interactive_button(rect, text, base_color):
             color = base_color
+            mouse_pos = pygame.mouse.get_pos()
             if rect.collidepoint(mouse_pos):
                 # 悬停时变亮
                 color = color.lerp(pygame.Color('white'), 0.2)

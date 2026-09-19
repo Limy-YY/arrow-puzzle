@@ -106,6 +106,36 @@ BTN_START_HOVER = pygame.Color('#86aa9a')
 BTN_SELECT_LEVEL = pygame.Color('#A9C2A8')  
 BTN_SELECT_LEVEL_HOVER = pygame.Color('#86aa9a') 
 
-    
+
 # 光束中心色（高亮暖黄）
 BEAM_CENTER_COLOR = (255, 250, 200)
+
+# === 方向向量映射（配合 DIR_* 常量使用）===
+DIRECTION_DELTAS = {
+    DIR_UP: (-1, 0),
+    DIR_DOWN: (1, 0),
+    DIR_LEFT: (0, -1),
+    DIR_RIGHT: (0, 1),
+}
+
+# === 箭头方向 -> 莫兰迪颜色映射 ===
+ARROW_COLORS = {
+    DIR_UP: ARROW_UP,
+    DIR_DOWN: ARROW_DOWN,
+    DIR_LEFT: ARROW_LEFT,
+    DIR_RIGHT: ARROW_RIGHT,
+}
+
+# === 游戏状态 ===
+STATE_PLAYING = 'playing'
+STATE_WON = 'won'
+STATE_LOST = 'lost'
+STATE_ALL_COMPLETED = 'all_completed'
+
+# === 场景名 ===
+SCENE_START = 'start'
+SCENE_LEVEL_SELECT = 'level_select'
+SCENE_GAME = 'game'
+
+# === 资源目录 ===
+ICONS_DIR = os.path.join(BASE_DIR, 'assets', 'icons')

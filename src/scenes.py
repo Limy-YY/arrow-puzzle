@@ -4,6 +4,7 @@ import math
 import copy
 from settings import *
 from background import FloatingArrows 
+import numpy as np
 
 class BaseScene:
     """场景基类：所有场景都要继承它"""
@@ -655,155 +656,39 @@ class GameScene(BaseScene):
             self.moving_arrow = None
 
     def draw(self):
-        self.screen.fill(BG_LIGHT)
+        """清屏 -> 绘制背景 -> 绘制棋盘 -> 绘制UI -> 绘制弹窗"""
+        # 1. 仅清屏一次，使用统一的基础背景色
+        self.game.screen.fill(BG_LIGHT)
         
-        # --- 绘制棋盘 ---
+        # 2. 绘制棋盘
         self._draw_board()
 
-        # === 绘制悬停阴影 ===
+        # 3. 绘制悬停阴影 (保留你原有的优秀细节)
         if self.hover_cell is not None and self.game_state == 'playing':
             r, c = self.hover_cell
             cell_x = self.offset_x + c * (self.cell_size + CELL_GAP)
             cell_y = self.offset_y + r * (self.cell_size + CELL_GAP)
             hover_rect = pygame.Rect(cell_x, cell_y, self.cell_size, self.cell_size)
             
-            # 绘制半透明阴影层（灰色，透明度约40%）
             shadow_surface = pygame.Surface((self.cell_size, self.cell_size), pygame.SRCALPHA)
-            shadow_surface.fill((100, 100, 100, 40))  # RGBA，最后一个是透明度
+            shadow_surface.fill((100, 100, 100, 40))
             self.game.screen.blit(shadow_surface, hover_rect.topleft)
         
-        # === 绘制正在移动的箭头 ===
+        # 4. 绘制正在移动的箭头 (保留你原有的平滑移动绘制逻辑)
         if self.moving_arrow is not None:
             arrow = self.moving_arrow
             direction = arrow['direction']
             pos = arrow['current_pos']
-            # 创建一个临时 rect 仅用于确定箭头大小，位置由 pos 参数决定
             temp_rect = pygame.Rect(0, 0, self.cell_size, self.cell_size)
             self._draw_arrow(temp_rect, direction, pos=pos)
 
+        # 5. 绘制顶部状态栏与底部按钮
         self.draw_top_bar()
-
         self.draw_bottom_buttons()
 
-        # === 弹窗绘制（仅在 won 或 lost 或 all_completed 状态下显示）===
+        # 6. 仅在特定状态下绘制新弹窗
         if self.game_state in ('won', 'lost', 'all_completed'):
-            mouse_pos = pygame.mouse.get_pos()
-
-            # 1. 半透明遮罩
-            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-            overlay.set_alpha(150)
-            overlay.fill((0, 0, 0))
-            self.screen.blit(overlay, (0, 0))
-
-            # 2. 弹窗背景
-            popup_rect = pygame.Rect(self.popup_x, self.popup_y, self.popup_width, self.popup_height)
-            pygame.draw.rect(self.screen, BG_LIGHT, popup_rect, border_radius=12)
-            pygame.draw.rect(self.screen, BG_DARK, popup_rect, width=2, border_radius=12)
-
-            # 3. 标题（大标题 + 副标题）
-            if self.game_state == 'all_completed':
-                title_text = "Level Complete!!"
-                subtitle_text = f"Time: {self.level_time_used}s!"
-                title_color = POPUP_TITLE_ALL_COMPLETED
-            elif self.game_state == 'won':
-                title_text = "Level Complete!"
-                subtitle_text = f"Time: {self.level_time_used}s"
-                title_color = POPUP_TITLE_WON
-            else:  # lost
-                title_text = "Game Over"
-                subtitle_text = "Don't give up, try again!"
-                title_color = POPUP_TITLE_LOST
-
-            # 渲染大标题（粗体）
-            title_surface = self.popup_title_font.render(title_text, True, title_color)
-            title_rect = title_surface.get_rect(center=(SCREEN_WIDTH // 2, self.popup_y + 45))
-            self.screen.blit(title_surface, title_rect)
-
-            # 渲染副标题（小字号，间距15px）
-            subtitle_surface = self.small_font.render(subtitle_text, True, STATUS_TEXT_COLOR)
-            subtitle_rect = subtitle_surface.get_rect(center=(SCREEN_WIDTH // 2, title_rect.bottom + 15))
-            self.screen.blit(subtitle_surface, subtitle_rect)
-
-            # === 同步弹窗按钮位置，确保点击区域与视觉位置一致 ===
-            btn_width = 130
-            btn_height = 45
-            center_x = SCREEN_WIDTH // 2
-            gap = 5
-            self.popup_left_btn.topleft = (
-                center_x - gap - btn_width,
-                self.popup_y + self.popup_height - btn_height - 20
-            )
-            self.popup_right_btn.topleft = (
-                center_x + gap,
-                self.popup_y + self.popup_height - btn_height - 20
-            )
-
-            # 4. 按钮
-            if self.game_state == 'all_completed':
-                # --- 全通关状态 ---
-                # 左侧按钮: Select Level
-                select_color = BTN_SELECT_LEVEL
-                if self.popup_left_btn.collidepoint(mouse_pos):
-                    select_color = select_color.lerp(pygame.Color('white'), 0.2)
-                pygame.draw.rect(self.screen, select_color, self.popup_left_btn, border_radius=8)
-                pygame.draw.rect(self.screen, pygame.Color('#C0C0C0'), self.popup_left_btn, 2, border_radius=8)
-                select_text = self.small_font.render("Select", True, TEXT_DARK_BG)
-                select_text_rect = select_text.get_rect(center=self.popup_left_btn.center)
-                self.screen.blit(select_text, select_text_rect)
-
-                # 右侧按钮: Return
-                return_color = BTN_BACK
-                if self.popup_right_btn.collidepoint(mouse_pos):
-                    return_color = return_color.lerp(pygame.Color('white'), 0.2)
-                pygame.draw.rect(self.screen, return_color, self.popup_right_btn, border_radius=8)
-                pygame.draw.rect(self.screen, pygame.Color('#C0C0C0'), self.popup_right_btn, 2, border_radius=8)
-                return_text = self.small_font.render("Return", True, TEXT_DARK_BG)
-                return_text_rect = return_text.get_rect(center=self.popup_right_btn.center)
-                self.screen.blit(return_text, return_text_rect)
-
-            elif self.game_state == 'won':
-                # --- 胜利状态 ---
-                # 左侧按钮: Return
-                return_color = BTN_BACK
-                if self.popup_left_btn.collidepoint(mouse_pos):
-                    return_color = return_color.lerp(pygame.Color('white'), 0.2)
-                pygame.draw.rect(self.screen, return_color, self.popup_left_btn, border_radius=8)
-                pygame.draw.rect(self.screen, pygame.Color('#C0C0C0'), self.popup_left_btn, 2, border_radius=8)
-                return_text = self.small_font.render("Return", True, TEXT_DARK_BG)
-                return_text_rect = return_text.get_rect(center=self.popup_left_btn.center)
-                self.screen.blit(return_text, return_text_rect)
-
-                # 右侧按钮: Next
-                next_color = BTN_NEXT
-                if self.popup_right_btn.collidepoint(mouse_pos):
-                    next_color = next_color.lerp(pygame.Color('white'), 0.2)
-                pygame.draw.rect(self.screen, next_color, self.popup_right_btn, border_radius=8)
-                pygame.draw.rect(self.screen, pygame.Color('#C0C0C0'), self.popup_right_btn, 2, border_radius=8)
-                next_text = self.small_font.render("Next", True, TEXT_DARK_BG)
-                next_text_rect = next_text.get_rect(center=self.popup_right_btn.center)
-                self.screen.blit(next_text, next_text_rect)
-
-            else:  # self.game_state == 'lost'
-                # --- 失败状态 ---
-                # 左侧按钮: Return
-                return_color = BTN_BACK
-                if self.popup_left_btn.collidepoint(mouse_pos):
-                    return_color = return_color.lerp(pygame.Color('white'), 0.2)
-                pygame.draw.rect(self.screen, return_color, self.popup_left_btn, border_radius=8)
-                pygame.draw.rect(self.screen, pygame.Color('#C0C0C0'), self.popup_left_btn, 2, border_radius=8)
-                return_text = self.small_font.render("Return", True, TEXT_DARK_BG)
-                return_text_rect = return_text.get_rect(center=self.popup_left_btn.center)
-                self.screen.blit(return_text, return_text_rect)
-
-                # 右侧按钮: Retry
-                retry_color = BTN_RETRY
-                if self.popup_right_btn.collidepoint(mouse_pos):
-                    retry_color = retry_color.lerp(pygame.Color('white'), 0.2)
-                pygame.draw.rect(self.screen, retry_color, self.popup_right_btn, border_radius=8)
-                pygame.draw.rect(self.screen, pygame.Color('#C0C0C0'), self.popup_right_btn, 2, border_radius=8)
-                retry_text = self.small_font.render("Retry", True, TEXT_DARK_BG)
-                retry_text_rect = retry_text.get_rect(center=self.popup_right_btn.center)
-                self.screen.blit(retry_text, retry_text_rect)
+            self._draw_popup_overlay()
 
     def _draw_board(self):
         """绘制棋盘网格及箭头"""
@@ -1030,6 +915,165 @@ class GameScene(BaseScene):
         select_text = self.btn_font.render("Select", True, TEXT_LIGHT_BG)
         select_text_rect = select_text.get_rect(center=self.select_btn.center)
         self.game.screen.blit(select_text, select_text_rect)
+
+    def _draw_popup_overlay(self):
+        """
+        重构后的弹窗绘制逻辑，包含光束、标题、按钮交互。
+        """
+        mouse_pos = pygame.mouse.get_pos()
+
+        # 1. 绘制半透明遮罩
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        overlay.set_alpha(150)
+        overlay.fill((0, 0, 0))
+        self.screen.blit(overlay, (0, 0))
+
+        # 2. 绘制像素级无缝平滑光束（稳健防报错版）
+        beam_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+        max_beam_length = 400
+        
+        
+        # 1. 使用 Numpy 计算完美平滑的光效强度（只算黑白明暗）
+        ys = np.arange(SCREEN_HEIGHT, dtype=np.float32)
+        xs = np.arange(SCREEN_WIDTH, dtype=np.float32)
+        # 创建坐标矩阵 (H, W)
+        xx, yy = np.meshgrid(xs - center[0], ys - center[1])
+        
+        # 计算极坐标
+        distances = np.sqrt(xx**2 + yy**2)
+        angles = np.arctan2(yy, xx)
+        
+        # 【无缝连续光束】：利用 cos 的绝对值实现完美的柔边，无硬切
+        angle_strength = np.abs(np.cos(angles * 10))
+        
+        # 【平滑径向衰减】：中心亮，边缘迅速柔和消失
+        dist_strength = np.maximum(0.0, 1.0 - distances / max_beam_length) ** 2
+        
+        # 计算最终单通道强度 (0.0 到 1.0)
+        intensity = (angle_strength * dist_strength).astype(np.float32)
+
+        # 2. 绘制经典无缝平滑光束）
+        beam_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+        max_beam_length = 200  # 【核心修改】将光束最大长度限制在 150px
+        num_beams = 16      
+
+        for i in range(num_beams):
+            angle_rad = math.radians((i / num_beams) * 360)
+            segments = 40
+            
+            for j in range(segments):
+                # 计算当前微段在整个200px长度中的比例（0 到 1）
+                ratio_start = j / segments
+                ratio_end = (j + 1) / segments
+                
+                # 真实的距离
+                dist_start = max_beam_length * ratio_start
+                dist_end = max_beam_length * ratio_end
+
+                # 平滑衰减：中心(0%)最亮，到边缘(100%)完全消失
+                ratio = ratio_end
+                current_alpha = int(180 * (1 - ratio) ** 1) 
+                
+                if current_alpha <= 0:
+                    continue
+
+                # 【宽度调整】因为总长度变短了，稍微加宽一点让比例更协调
+                width_start = 2 + 25 * ratio_start 
+                width_end = 2 + 25 * ratio_end
+
+                cos_a = math.cos(angle_rad)
+                sin_a = math.sin(angle_rad)
+
+                # 计算起点两个端点 (p1, p2)
+                px_start = -width_start * sin_a
+                py_start = width_start * cos_a
+                p1 = (center[0] + dist_start * cos_a + px_start, 
+                      center[1] + dist_start * sin_a + py_start)
+                p2 = (center[0] + dist_start * cos_a - px_start, 
+                      center[1] + dist_start * sin_a - py_start)
+
+                # 计算终点两个端点 (p3, p4)
+                px_end = -width_end * sin_a
+                py_end = width_end * cos_a
+                p3 = (center[0] + dist_end * cos_a + px_end, 
+                      center[1] + dist_end * sin_a + py_end)
+                p4 = (center[0] + dist_end * cos_a - px_end, 
+                      center[1] + dist_end * sin_a - py_end)
+
+                # 绘制这一小段光束
+                segment_color = (*BEAM_CENTER_COLOR, current_alpha)
+                pygame.draw.polygon(beam_surface, segment_color, [p1, p3, p4, p2])
+
+        # 将光束层绘制到主屏幕上
+        self.game.screen.blit(beam_surface, (0, 0))
+        # 3. 绘制弹窗主体
+        popup_rect = pygame.Rect(self.popup_x, self.popup_y, self.popup_width, self.popup_height)
+
+        # 绘制白底和边框
+        pygame.draw.rect(self.screen, BG_LIGHT, popup_rect, border_radius=16)
+        pygame.draw.rect(self.screen, BG_DARK, popup_rect, width=2, border_radius=16)
+
+        # 4. 绘制文本内容（保留原有的动态逻辑）
+        if self.game_state == 'all_completed':
+            title_text = "Level Complete!!"
+            subtitle_text = f"Time: {self.level_time_used}s!"
+            title_color = POPUP_TITLE_ALL_COMPLETED
+        elif self.game_state == 'won':
+            title_text = "Level Complete!"
+            subtitle_text = f"Time: {self.level_time_used}s"
+            title_color = POPUP_TITLE_WON
+        else:  # lost
+            title_text = "Game Over"
+            subtitle_text = "Don't give up, try again!"
+            title_color = POPUP_TITLE_LOST
+
+        title_surface = self.popup_title_font.render(title_text, True, title_color)
+        title_rect = title_surface.get_rect(center=(SCREEN_WIDTH // 2, self.popup_y + 45))
+        self.screen.blit(title_surface, title_rect)
+
+        subtitle_surface = self.small_font.render(subtitle_text, True, STATUS_TEXT_COLOR)
+        subtitle_rect = subtitle_surface.get_rect(center=(SCREEN_WIDTH // 2, title_rect.bottom + 15))
+        self.screen.blit(subtitle_surface, subtitle_rect)
+
+        # 5. 同步按钮位置（确保点击区域与视觉一致）
+        btn_width = 130
+        btn_height = 45
+        center_x = SCREEN_WIDTH // 2
+        gap = 5
+        self.popup_left_btn.topleft = (
+            center_x - gap - btn_width,
+            self.popup_y + self.popup_height - btn_height - 20
+        )
+        self.popup_right_btn.topleft = (
+            center_x + gap,
+            self.popup_y + self.popup_height - btn_height - 20
+        )
+
+        # 辅助函数：绘制带悬停交互的圆角按钮
+        def draw_interactive_button(rect, text, base_color):
+            color = base_color
+            if rect.collidepoint(mouse_pos):
+                # 悬停时变亮
+                color = color.lerp(pygame.Color('white'), 0.2)
+            pygame.draw.rect(self.screen, color, rect, border_radius=8)
+            pygame.draw.rect(self.screen, pygame.Color('#C0C0C0'), rect, 2, border_radius=8)
+            
+            btn_text_surface = self.small_font.render(text, True, TEXT_DARK_BG)
+            btn_text_rect = btn_text_surface.get_rect(center=rect.center)
+            self.screen.blit(btn_text_surface, btn_text_rect)
+
+        # 6. 根据不同游戏状态绘制对应的按钮
+        if self.game_state == 'all_completed':
+            draw_interactive_button(self.popup_left_btn, "Select", BTN_SELECT_LEVEL)
+            draw_interactive_button(self.popup_right_btn, "Return", BTN_BACK)
+        elif self.game_state == 'won':
+            draw_interactive_button(self.popup_left_btn, "Return", BTN_BACK)
+            draw_interactive_button(self.popup_right_btn, "Next", BTN_NEXT)
+        else:  # lost
+            draw_interactive_button(self.popup_left_btn, "Return", BTN_BACK)
+            draw_interactive_button(self.popup_right_btn, "Retry", BTN_RETRY)
 
 class SceneManager:
     """场景管理器：负责切换和更新当前场景"""
